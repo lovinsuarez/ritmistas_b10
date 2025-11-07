@@ -1,15 +1,27 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
-# Usamos uma imagem que já tem o Flutter SDK
 FROM cirrusci/flutter:stable as build
 
-# Copia o código do seu projeto para dentro do container
-COPY . .
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia os arquivos de dependência primeiro
+# Isso otimiza o cache do Docker
+COPY pubspec.yaml pubspec.lock ./
+
+# Instala as dependências
+RUN flutter pub get
+
+# Agora copia apenas os diretórios necessários para o build
+# Isso evita o conflito com o "lib" da imagem base
+COPY lib/ ./lib/
+COPY web/ ./web/
+# Se você tiver uma pasta 'assets', descomente a linha abaixo
+# COPY assets/ ./assets/
 
 # Executa o comando de build do Flutter
 RUN flutter build web --release
 
 # ESTÁGIO 2: Servir o App (Serve Stage)
-# Usamos um servidor web leve (Nginx) para servir os arquivos estáticos
 FROM nginx:alpine as final
 
 # Copia APENAS os arquivos construídos do Estágio 1 para o servidor web
