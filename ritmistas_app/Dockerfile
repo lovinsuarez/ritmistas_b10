@@ -1,6 +1,6 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
-# MUDANÇA 1: Trocamos a imagem base para uma confiável
-FROM fluttercommunity/flutter:3.19.0 as build
+# MUDANÇA FINAL: Usando a imagem 'instrumentisto' que TEM a tag de versão
+FROM instrumentisto/flutter:3.19.0 as build
 
 # Define o diretório de trabalho
 WORKDIR /app
@@ -8,8 +8,7 @@ WORKDIR /app
 # Copia os arquivos de dependência
 COPY pubspec.yaml pubspec.lock ./
 
-# MUDANÇA 2: Remove o lockfile para forçar uma resolução limpa.
-# Isso corrige muitos erros silenciosos do 'pub get'.
+# Remove o lockfile para forçar uma resolução limpa.
 RUN rm -f pubspec.lock
 
 # Instala as dependências
