@@ -1,5 +1,5 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
-FROM cirrusci/flutter:3.19.0 as build
+FROM cirrusci/flutter:latest as build
 
 # Define o diretório de trabalho
 WORKDIR /app
