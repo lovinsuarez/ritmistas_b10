@@ -1,18 +1,21 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
-FROM cirrusci/flutter:latest as build
+# MUDANÇA 1: Trocamos a imagem base para uma confiável
+FROM fluttercommunity/flutter:3.19.0 as build
 
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de dependência primeiro
-# Isso otimiza o cache do Docker
+# Copia os arquivos de dependência
 COPY pubspec.yaml pubspec.lock ./
+
+# MUDANÇA 2: Remove o lockfile para forçar uma resolução limpa.
+# Isso corrige muitos erros silenciosos do 'pub get'.
+RUN rm -f pubspec.lock
 
 # Instala as dependências
 RUN flutter pub get
 
 # Agora copia apenas os diretórios necessários para o build
-# Isso evita o conflito com o "lib" da imagem base
 COPY lib/ ./lib/
 COPY web/ ./web/
 # Se você tiver uma pasta 'assets', descomente a linha abaixo
