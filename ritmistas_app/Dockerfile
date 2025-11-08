@@ -1,6 +1,6 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
 # MUDANÇA FINAL: Usando a imagem 'instrumentisto' que TEM a tag de versão
-FROM instrumentisto/flutter:3.19.0 as build
+FROM cirrusci/flutter:latest AS build
 
 # Define o diretório de trabalho
 WORKDIR /app
