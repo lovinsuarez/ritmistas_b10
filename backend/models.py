@@ -8,7 +8,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 
-from database import Base # Importa a Base do nosso arquivo database.py
+# IMPORTANTE: Esta linha importa o 'Base' do arquivo database.py
+from database import Base 
 
 # Define os ENUMs (tipos especiais) que o PostgreSQL usará
 class UserRole(enum.Enum):
@@ -32,10 +33,6 @@ class Sector(Base):
     name = Column(String(100), nullable=False)
     invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
     
-    #
-    # --- CORREÇÃO 1 ---
-    # Adicionamos 'use_alter=True' E um 'name' para a Chave Estrangeira
-    #
     lider_id = Column(
         Integer, 
         ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), 
@@ -58,9 +55,6 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
     
-    # --- CORREÇÃO 2 ---
-    # Adicionamos um 'name' para a outra Chave Estrangeira
-    #
     sector_id = Column(
         Integer, 
         ForeignKey("sectors.sector_id", name="fk_user_sector"), 
@@ -82,8 +76,6 @@ class User(Base):
     created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
     assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
-
-# (O restante do arquivo: Activity, CheckIn, etc. está 100% correto)
 
 # Modelo da Tabela 'Activities' (Eventos/Atividades)
 class Activity(Base):
