@@ -29,3 +29,35 @@ cd backend
 .\venv\Scripts\activate
     iniciar 
     uvicorn main:app --reload
+
+
+_________________________________________________________________________________
+
+Usuario comum 
+resgate de pontos 
+ver ranking do setor 
+ver ranking geral da B10
+dashboard de tarefas do usuario
+grupo de setores 
+
+
+Lider 
+resgate de pontos 
+ver ranking do setor 
+ver ranking geral da B10
+dashboard de tarefas do usuario
+adicionar e remover pessoas do setor
+criar codigo de pontos para ser resgatado 
+link de convite para o seu setor
+aprovação de entrada no setor
+gerador de tarefas 
+exportar relatorios
+
+ADMIN MASTER
+
+adicionar e remover lideres
+
+
+usuario 2
+lider 1
+admin master 0

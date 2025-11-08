@@ -26,8 +26,10 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
   Future<List<UserAdminView>> _loadUsers() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('access_token');
-    if (_token == null) throw Exception("Admin não autenticado.");
-    return _apiService.getAdminUsers(_token!);
+    if (_token == null) throw Exception("Líder não autenticado.");
+
+    // ALTERADO: Chamando a nova função correta do ApiService
+    return _apiService.getSectorUsers(_token!);
   }
 
   Future<void> _refreshUsers() async {
@@ -46,74 +48,15 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
     );
   }
 
-  // --- Ações do Admin ---
+  // --- Ações do Líder ---
 
-  void _handlePromote(UserAdminView user) async {
-    if (_token == null) return;
+  // REMOVIDO: A função _handlePromote foi removida.
+  // Apenas o Admin Master pode promover.
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar Promoção'),
-        content: Text(
-          'Tem certeza que deseja promover ${user.username} para Administrador? Esta ação é irreversível.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Promover'),
-          ),
-        ],
-      ),
-    );
+  // REMOVIDO: A função _handleDemote foi removida.
+  // Apenas o Admin Master pode rebaixar.
 
-    if (confirm == true) {
-      try {
-        await _apiService.promoteUser(_token!, user.userId);
-        _refreshUsers(); // Atualiza a lista
-      } catch (e) {
-        _showError(e.toString());
-      }
-    }
-  }
-
-  void _handleDemote(UserAdminView user) async {
-    if (_token == null) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar Rebaixamento'),
-        content: Text(
-          'Tem certeza que deseja rebaixar ${user.username} para Usuário?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Rebaixar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _apiService.demoteUser(_token!, user.userId);
-        _refreshUsers(); // Atualiza a lista
-      } catch (e) {
-        _showError(e.toString());
-      }
-    }
-  }
-
+  // Esta função está CORRETA. O Líder pode remover usuários.
   void _handleDelete(UserAdminView user) async {
     if (_token == null) return;
 
@@ -131,7 +74,7 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('EXCLUIR', style: TextStyle(color: Colors.red)),
+            child: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -161,7 +104,9 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Erro: ${snapshot.error}'),
+                  Text(
+                    'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
+                  ),
                   ElevatedButton(
                     onPressed: _refreshUsers,
                     child: const Text('Tentar Novamente'),
@@ -185,66 +130,48 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
               itemCount: users.length,
               itemBuilder: (context, index) {
                 final user = users[index];
-                final bool isAdmin = user.role == 'admin';
+
+                // ALTERADO: A lógica agora checa 'Líder' (role "1")
+                // O antigo 'admin' agora é 'lider'
+                final bool isLider = user.role == '1';
+                final bool isUser = user.role == '2';
 
                 return ListTile(
                   title: Text(
                     user.username,
                     style: TextStyle(
-                      fontWeight: isAdmin ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isLider ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   subtitle: Text(user.email),
                   leading: Icon(
-                    isAdmin ? Icons.admin_panel_settings : Icons.person,
+                    // ALTERADO: Ícone para Líder
+                    isLider ? Icons.security : Icons.person,
                   ),
-                  trailing: PopupMenuButton(
-                    // Botão de "3 pontinhos"
-                    itemBuilder: (context) {
-                      // Lista de opções
-                      final options = <PopupMenuEntry<String>>[];
 
-                      // Lógica de Promover / Rebaixar
-                      if (isAdmin) {
-                        options.add(
-                          const PopupMenuItem(
-                            value: 'demote',
-                            child: Text('Rebaixar para Usuário'),
-                          ),
-                        );
-                      } else {
-                        options.add(
-                          const PopupMenuItem(
-                            value: 'promote',
-                            child: Text('Promover a Admin'),
-                          ),
-                        );
-                      }
-
-                      // Opção de Deletar (sempre aparece)
-                      options.add(const PopupMenuDivider());
-                      options.add(
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text(
-                            'Excluir Usuário',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      );
-
-                      return options;
-                    },
-                    onSelected: (value) {
-                      if (value == 'promote') {
-                        _handlePromote(user);
-                      } else if (value == 'demote') {
-                        _handleDemote(user);
-                      } else if (value == 'delete') {
-                        _handleDelete(user);
-                      }
-                    },
-                  ),
+                  // ALTERADO: O menu de "3 pontinhos"
+                  // Só aparece para Usuários (role "2")
+                  trailing: isUser
+                      ? PopupMenuButton(
+                          itemBuilder: (context) {
+                            // A única opção para o Líder é 'Excluir'
+                            return <PopupMenuEntry<String>>[
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text(
+                                  'Excluir Usuário',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ];
+                          },
+                          onSelected: (value) {
+                            if (value == 'delete') {
+                              _handleDelete(user);
+                            }
+                          },
+                        )
+                      : null, // Não mostra menu para outros Líderes
                 );
               },
             ),
@@ -252,10 +179,9 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
         },
       ),
 
-      // BOTÃO FLUTUANTE (FAB) PARA CRIAR CÓDIGOS
+      // Este botão está CORRETO. O Líder pode criar códigos.
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // Navega para a nova tela de criação de código
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const AdminCriarCodigoPage(),

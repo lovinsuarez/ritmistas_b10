@@ -1,18 +1,16 @@
 # C:\Users\jeatk\OneDrive\Documents\GitHub\ritimistas_b10\backend\main.py
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from datetime import timedelta
+from typing import List # NOVO: Importar 'List' para response_models
 
 # Importa tudo que criamos nos outros arquivos
 import crud, models, schemas, security
 from database import engine, get_db
 
 # --- Criação das Tabelas no Banco ---
-# Esta linha diz ao SQLAlchemy para criar todas as tabelas
-# (baseado nos nossos 'models.py') no banco de dados do Render.
-# (Só executa se as tabelas ainda não existirem)
 models.Base.metadata.create_all(bind=engine)
 
 # --- Inicialização do App FastAPI ---
@@ -22,15 +20,11 @@ app = FastAPI(
 )
 origins = [
     "*", # O "*" permite TODAS as origens. É o mais simples para desenvolvimento.
-    # Mais tarde, poderíamos restringir para:
-    # "http://localhost",
-    # "http://localhost:8080",
-    # "http://localhost:5000", # Adicione a porta que o Flutter usar
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       # Quais origens são permitidas
+    allow_origins=origins,      # Quais origens são permitidas
     allow_credentials=True,    # Permitir cookies (se usarmos)
     allow_methods=["*"],       # Quais métodos HTTP são permitidos (GET, POST, etc.)
     allow_headers=["*"],       # Quais cabeçalhos HTTP são permitidos
@@ -38,19 +32,22 @@ app.add_middleware(
 
 # --- Endpoints (Rotas da API) ---
 
+# ============================================
+# ENDPOINTS PÚBLICOS (Registro e Login)
+# ============================================
+
 @app.get("/")
 def read_root():
     """Endpoint inicial apenas para testar se a API está online."""
     return {"status": "API Ritmistas B10 está online!"}
 
 
-@app.post("/auth/register/admin", response_model=schemas.User)
-def register_admin(admin_data: schemas.AdminCreate, db: Session = Depends(get_db)):
+# ALTERADO: Agora usa 'UserCreate' e 'create_admin_master'
+@app.post("/auth/register/admin-master", response_model=schemas.User)
+def register_admin_master(admin_data: schemas.UserCreate, db: Session = Depends(get_db)):
     """
-    Endpoint para registrar o primeiro Administrador e seu Setor.
+    Endpoint para registrar o primeiro Administrador Master (sem setor).
     """
-    
-    # 1. Verifica se o email já existe
     db_user = crud.get_user_by_email(db, email=admin_data.email)
     if db_user:
         raise HTTPException(
@@ -58,171 +55,21 @@ def register_admin(admin_data: schemas.AdminCreate, db: Session = Depends(get_db
             detail="Email já registrado."
         )
     
-    # 2. Chama a função do crud para criar o admin e o setor
     try:
-        new_admin = crud.create_admin_and_sector(db=db, admin_data=admin_data)
+        new_admin = crud.create_admin_master(db=db, admin_data=admin_data)
         return new_admin
     except Exception as e:
-        # Se algo der errado (ex: erro de banco), desfaz a transação
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar admin: {str(e)}"
         )
 
-@app.post("/auth/token", response_model=schemas.Token)
-def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    db: Session = Depends(get_db)
-):
-    """
-    Endpoint de Login. Recebe email (no campo 'username') e senha.
-    Retorna um Token JWT.
-    """
-
-    # 1. Busca o usuário pelo email (que vem no campo 'username' do formulário)
-    user = crud.get_user_by_email(db, email=form_data.username)
-
-    # 2. Verifica se o usuário existe E se a senha está correta
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 3. Cria o token de acesso
-    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = security.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-
-    # 4. Retorna o token
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@app.post("/redeem")
-def redeem_code_endpoint(
-    redeem_request: schemas.RedeemCodeRequest,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user) # <-- ROTA PROTEGIDA!
-):
-    """
-    Endpoint para um usuário resgatar um código (geral ou único).
-    """
-
-    # 1. Busca o código no banco
-    code = crud.get_code_by_string(db, code_string=redeem_request.code_string)
-    if not code:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Código não encontrado."
-        )
-
-    # 2. Tenta resgatar o código (a função do crud trata das regras)
-    try:
-        message = crud.redeem_code(db=db, user=current_user, code=code)
-
-        # Verifica se a mensagem é de sucesso ou de erro de regra
-        if "sucesso" not in message:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return {"detail": message}
-
-    except Exception as e:
-        db.rollback()
-        # Se for um HTTPException que já definimos, apenas o repasse
-        if isinstance(e, HTTPException):
-            raise e
-        # Se for um erro inesperado
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno: {str(e)}"
-        )
-
-@app.post("/admin/codes/general", status_code=status.HTTP_201_CREATED)
-def create_general_code_endpoint(
-    code_data: schemas.CodeCreateGeneral,
-    db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
-):
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas admins podem criar códigos.")
-
-    # TODO: verificar se o código já existe
-
-    return crud.create_general_code(db=db, code_data=code_data, admin=current_admin)
-
-
-@app.post("/admin/codes/unique", status_code=status.HTTP_201_CREATED)
-def create_unique_code_endpoint(
-    code_data: schemas.CodeCreateUnique,
-    db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
-):
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas admins podem criar códigos.")
-
-    # TODO: verificar se o usuário a ser atribuído existe
-
-    return crud.create_unique_code(db=db, code_data=code_data, admin=current_admin)
-
-@app.post("/checkin")
-def checkin_endpoint(
-    checkin_request: schemas.CheckInRequest,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user) # Rota protegida
-):
-    """
-    Endpoint para um usuário fazer check-in (ler QRCode de atividade).
-    """
-    try:
-        message = crud.create_checkin(
-            db=db, 
-            user=current_user, 
-            activity_id=checkin_request.activity_id
-        )
-
-        if "sucesso" not in message:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return {"detail": message}
-
-    except Exception as e:
-        db.rollback()
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno: {str(e)}"
-        )
-    
-@app.get("/ranking", response_model=schemas.RankingResponse)
-def get_ranking_endpoint(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user) # Rota protegida
-):
-    """
-    Retorna o ranking completo do setor do usuário logado.
-    """
-    ranking_data = crud.get_sector_ranking(db=db, sector_id=current_user.sector_id)
-
-    return {
-        "my_user_id": current_user.user_id,
-        "ranking": ranking_data
-    }
-
 @app.post("/auth/register/user", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def register_user(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     """
     Endpoint para um usuário normal se registrar usando um link de convite.
     """
-    # Verifica se o email já existe
     db_user = crud.get_user_by_email(db, email=user_data.email)
     if db_user:
         raise HTTPException(
@@ -230,7 +77,6 @@ def register_user(user_data: schemas.UserRegister, db: Session = Depends(get_db)
             detail="Email já registrado."
         )
 
-    # Tenta criar o usuário
     new_user = crud.create_user_from_invite(db=db, user_data=user_data)
 
     if not new_user:
@@ -241,145 +87,305 @@ def register_user(user_data: schemas.UserRegister, db: Session = Depends(get_db)
 
     return new_user
 
-@app.get("/admin/my-sector", response_model=schemas.SectorInfo)
-def get_my_sector_info(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
+@app.post("/auth/token", response_model=schemas.Token)
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
 ):
-    """Retorna as informações do setor do usuário logado."""
+    """
+    Endpoint de Login. Recebe email (no campo 'username') e senha.
+    Retorna um Token JWT.
+    """
+    user = crud.get_user_by_email(db, email=form_data.username)
 
-    # Esta rota pode ser usada por qualquer usuário, não apenas admin
-    sector = crud.get_sector_by_id(db, sector_id=current_user.sector_id)
-    if not sector:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
+    if not user or not security.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou senha incorretos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    return sector
+    access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
 
-@app.get("/users/me", response_model=schemas.UserResponse) # <-- MUDANÇA AQUI
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# ============================================
+# ENDPOINTS DE USUÁRIO (Todos os papéis)
+# ============================================
+
+@app.get("/users/me", response_model=schemas.UserResponse)
 def read_users_me(
-    db: Session = Depends(get_db), # <-- ADICIONA O db
+    db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
     """
     Retorna os dados do usuário atualmente logado.
-    Se for admin, inclui o código de convite do setor.
+    Se for Líder ou Admin, inclui o código de convite do setor.
     """
     invite_code = None
     
-    # Se for admin, busca o código de convite do setor
-    if current_user.role == models.UserRole.admin:
-        sector = crud.get_sector_by_id(db=db, sector_id=current_user.sector_id)
-        if sector:
-            invite_code = sector.invite_code
+    # ALTERADO: Líderes também podem ver o código de convite
+    if current_user.role in [models.UserRole.admin, models.UserRole.lider]:
+        if current_user.sector_id:
+            sector = crud.get_sector_by_id(db=db, sector_id=current_user.sector_id)
+            if sector:
+                invite_code = sector.invite_code
             
-    # Retorna o novo schema com todos os dados
     return schemas.UserResponse(
         user_id=current_user.user_id,
         username=current_user.username,
         email=current_user.email,
         role=current_user.role,
         sector_id=current_user.sector_id,
-        invite_code=invite_code # <-- NOVO CAMPO
+        invite_code=invite_code
     )
 
-@app.post("/admin/activities", status_code=status.HTTP_201_CREATED)
+@app.get("/users/my-sector", response_model=schemas.SectorInfo)
+def get_my_sector_info(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Retorna as informações do setor do usuário logado (Usuário ou Líder)."""
+    if not current_user.sector_id:
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Este usuário não pertence a um setor.")
+
+    sector = crud.get_sector_by_id(db, sector_id=current_user.sector_id)
+    if not sector:
+       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
+
+    return sector
+
+# ============================================
+# ENDPOINTS DE "USUARIO" (Função: user)
+# ============================================
+
+@app.post("/user/redeem")
+def redeem_code_endpoint(
+    redeem_request: schemas.RedeemCodeRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """ [Usuário] Endpoint para um usuário resgatar um código. """
+
+    # NOVO: Verifica se é um usuário
+    if current_user.role != models.UserRole.user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas usuários podem resgatar códigos.")
+
+    code = crud.get_code_by_string(db, code_string=redeem_request.code_string)
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Código não encontrado."
+        )
+
+    try:
+        message = crud.redeem_code(db=db, user=current_user, code=code)
+        if "sucesso" not in message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+        return {"detail": message}
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno: {str(e)}"
+        )
+
+@app.post("/user/checkin")
+def checkin_endpoint(
+    checkin_request: schemas.CheckInRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """ [Usuário] Endpoint para um usuário fazer check-in. """
+
+    # NOVO: Verifica se é um usuário
+    if current_user.role != models.UserRole.user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas usuários podem fazer check-in.")
+
+    try:
+        message = crud.create_checkin(
+            db=db, 
+            user=current_user, 
+            activity_id=checkin_request.activity_id
+        )
+        if "sucesso" not in message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+        return {"detail": message}
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno: {str(e)}"
+        )
+
+# ============================================
+# ENDPOINTS DE RANKING (Todos os papéis)
+# ============================================
+
+@app.get("/ranking/sector", response_model=schemas.RankingResponse)
+def get_sector_ranking_endpoint(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """ Retorna o ranking do setor do usuário logado (Usuário ou Líder). """
+    
+    if not current_user.sector_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin Master não possui ranking de setor. Use /ranking/geral."
+        )
+        
+    ranking_data = crud.get_sector_ranking(db=db, sector_id=current_user.sector_id)
+    return {
+        "my_user_id": current_user.user_id,
+        "ranking": ranking_data
+    }
+
+# NOVO: Endpoint para o Ranking Geral
+@app.get("/ranking/geral", response_model=schemas.RankingResponse)
+def get_geral_ranking_endpoint(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """ Retorna o ranking geral de todos os usuários (B10). """
+    
+    ranking_data = crud.get_geral_ranking(db=db)
+    return {
+        "my_user_id": current_user.user_id,
+        "ranking": ranking_data
+    }
+
+# ============================================
+# ENDPOINTS DE LÍDER (Líder e Admin Master)
+# ============================================
+
+# ALTERADO: Rota, dependência e lógica de permissão
+@app.post("/lider/codes/general", status_code=status.HTTP_201_CREATED)
+def create_general_code_endpoint(
+    code_data: schemas.CodeCreateGeneral,
+    db: Session = Depends(get_db),
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+):
+    """ [Líder] Cria um código de resgate geral para o seu setor. """
+    
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
+
+    return crud.create_general_code(db=db, code_data=code_data, creator=current_lider)
+
+
+# ALTERADO: Rota, dependência e lógica de permissão
+@app.post("/lider/codes/unique", status_code=status.HTTP_201_CREATED)
+def create_unique_code_endpoint(
+    code_data: schemas.CodeCreateUnique,
+    db: Session = Depends(get_db),
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+):
+    """ [Líder] Cria um código de resgate único para um usuário do seu setor. """
+
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
+        
+    # TODO: verificar se o usuário a ser atribuído (code_data.assigned_user_id) 
+    #       realmente pertence ao setor do líder (current_lider.sector_id)
+
+    return crud.create_unique_code(db=db, code_data=code_data, creator=current_lider)
+
+# ALTERADO: Rota e dependência
+@app.post("/lider/activities", status_code=status.HTTP_201_CREATED)
 def create_activity_endpoint(
     activity_data: schemas.ActivityCreate,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
 ):
-    """Endpoint para um admin criar uma nova atividade."""
+    """ [Líder] Cria uma nova atividade para o seu setor. """
 
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas admins podem criar atividades.")
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
 
     try:
-        activity = crud.create_activity(db=db, activity_data=activity_data, admin=current_admin)
+        activity = crud.create_activity(db=db, activity_data=activity_data, creator=current_lider)
         return activity
     except ValueError as e:
-        # Captura a regra de negócio do 'address'
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro interno: {str(e)}")
-    
 
-@app.get("/admin/activities", response_model=list[schemas.Activity])
+# ALTERADO: Rota e dependência
+@app.get("/lider/activities", response_model=List[schemas.Activity])
 def get_activities_endpoint(
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
 ):
-    """Retorna todas as atividades do setor do admin logado."""
+    """ [Líder] Retorna todas as atividades do seu setor. """
+    
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
 
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas admins podem ver as atividades.")
-
-    activities = crud.get_activities_by_sector(db=db, sector_id=current_admin.sector_id)
+    activities = crud.get_activities_by_sector(db=db, sector_id=current_lider.sector_id)
     return activities
 
-@app.get("/admin/users", response_model=list[schemas.UserAdminView])
+# ALTERADO: Rota e dependência
+@app.get("/lider/users", response_model=List[schemas.UserAdminView])
 def get_users_endpoint(
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
 ):
-    """[Admin] Retorna todos os usuários do setor do admin."""
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
+    """ [Líder] Retorna todos os usuários do seu setor. """
+    
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
 
-    return crud.get_users_by_sector(db=db, sector_id=current_admin.sector_id)
+    return crud.get_users_by_sector(db=db, sector_id=current_lider.sector_id)
 
-
-@app.put("/admin/users/{user_id}/promote", response_model=schemas.UserAdminView)
-def promote_user_endpoint(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
-):
-    """[Admin] Promove um usuário a admin."""
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
-
-    user_to_promote = crud.get_user_by_id(db, user_id=user_id)
-
-    if not user_to_promote or user_to_promote.sector_id != current_admin.sector_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado neste setor.")
-
-    return crud.update_user_role(db=db, user_to_update=user_to_promote, new_role=models.UserRole.admin)
-
-
-@app.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+# ALTERADO: Rota e permissão
+@app.delete("/lider/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
 ):
-    """[Admin] Deleta um usuário do setor."""
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
-
-    if user_id == current_admin.user_id:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin não pode deletar a si mesmo.")
+    """ [Líder] Deleta um usuário do seu setor. """
+    
+    if user_id == current_lider.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Líder não pode deletar a si mesmo.")
 
     user_to_delete = crud.get_user_by_id(db, user_id=user_id)
 
-    if not user_to_delete or user_to_delete.sector_id != current_admin.sector_id:
+    if not user_to_delete or user_to_delete.sector_id != current_lider.sector_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado neste setor.")
+        
+    # NOVO: Líder só pode deletar usuários
+    if user_to_delete.role != models.UserRole.user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Líderes só podem deletar usuários.")
 
     crud.delete_user(db=db, user_to_delete=user_to_delete)
     return {"ok": True} # Retorno 204 não tem corpo
 
-@app.get("/admin/users/{user_id}/dashboard", response_model=schemas.UserDashboard)
-@app.get("/admin/users/{user_id}/dashboard", response_model=schemas.UserDashboard)
+# ALTERADO: Rota e permissão
+@app.get("/lider/users/{user_id}/dashboard", response_model=schemas.UserDashboard)
 def get_user_dashboard_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
+    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
 ):
     """
-    Retorna a dashboard detalhada de um usuário específico.
-    Acesso permitido se:
-    1. O requisitante é um Admin do mesmo setor.
-    2. O requisitante é o próprio usuário (vendo seu dashboard).
+    [Líder] Retorna a dashboard detalhada de um usuário específico do seu setor.
+    (Também permite que um usuário veja o seu próprio dashboard)
     """
     
     # 1. Verifica se o usuário-alvo (user_id) existe
@@ -387,23 +393,23 @@ def get_user_dashboard_endpoint(
     if not target_user:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário alvo não encontrado.")
 
-    # 2. Verifica se o requisitante (current_user) tem permissão
-    is_admin = current_user.role == models.UserRole.admin
-    is_self = current_user.user_id == user_id
+    # 2. Verifica se o requisitante (current_lider) tem permissão
+    is_lider_or_admin = current_lider.role in [models.UserRole.lider, models.UserRole.admin]
+    is_self = current_lider.user_id == user_id
     
-    # Bloqueia se não for admin E não for ele mesmo
-    if not is_admin and not is_self:
+    if not is_lider_or_admin and not is_self:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
         
-    # Bloqueia se não estiverem no mesmo setor
-    if target_user.sector_id != current_user.sector_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não pertence ao seu setor.")
+    if target_user.sector_id != current_lider.sector_id:
+        # Exceção para Admin Master, que pode não ter setor mas pode ver tudo
+        if current_lider.role != models.UserRole.admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não pertence ao seu setor.")
 
     # 3. Se passou, busca os dados
     dashboard_data = crud.get_user_dashboard_details(
         db=db, 
         user_id=user_id, 
-        sector_id=current_user.sector_id
+        sector_id=target_user.sector_id # Usa o sector_id do alvo
     )
     
     if not dashboard_data:
@@ -411,22 +417,92 @@ def get_user_dashboard_endpoint(
         
     return dashboard_data
 
-@app.put("/admin/users/{user_id}/demote", response_model=schemas.UserAdminView)
-def demote_user_endpoint(
+# ============================================
+# ENDPOINTS DE ADMIN MASTER (Admin Master)
+# ============================================
+
+# NOVO: Endpoint para Admin Master criar setores
+@app.post("/admin-master/sectors", response_model=schemas.Sector)
+def create_sector_endpoint(
+    sector_name: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Cria um novo setor (organização). """
+    return crud.create_sector(db=db, sector_name=sector_name)
+
+# NOVO: Endpoint para Admin Master ver todos os setores
+@app.get("/admin-master/sectors", response_model=List[schemas.Sector])
+def get_all_sectors_endpoint(
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Lista todos os setores criados. """
+    return crud.get_all_sectors(db=db)
+
+# NOVO: Endpoint para Admin Master ver todos os líderes
+@app.get("/admin-master/liders", response_model=List[schemas.UserAdminView])
+def get_all_liders_endpoint(
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Lista todos os usuários que são Líderes. """
+    return crud.get_liders(db=db)
+
+# ALTERADO: Rota e permissão
+@app.put("/admin-master/users/{user_id}/promote-to-lider", response_model=schemas.UserAdminView)
+def promote_user_to_lider_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_user)
+    current_admin: models.User = Depends(security.get_current_admin_master) # <-- NOVO GUARDA
 ):
-    """[Admin] Rebaixa um admin para usuário."""
-    if current_admin.role != models.UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
+    """ [Admin Master] Promove um usuário (user) para Líder (lider). """
     
-    if user_id == current_admin.user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin não pode rebaixar a si mesmo.")
+    user_to_promote = crud.get_user_by_id(db, user_id=user_id)
 
-    user_to_demote = crud.get_user_by_id(db, user_id=user_id)
+    if not user_to_promote:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+        
+    if user_to_promote.role != models.UserRole.user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Apenas usuários comuns podem ser promovidos a líder.")
+
+    return crud.update_user_role(db=db, user_to_update=user_to_promote, new_role=models.UserRole.lider)
+
+# ALTERADO: Rota e permissão
+@app.put("/admin-master/liders/{lider_id}/demote-to-user", response_model=schemas.UserAdminView)
+def demote_lider_to_user_endpoint(
+    lider_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master) # <-- NOVO GUARDA
+):
+    """ [Admin Master] Rebaixa um Líder (lider) para Usuário (user). """
     
-    if not user_to_demote or user_to_demote.sector_id != current_admin.sector_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado neste setor.")
+    if lider_id == current_admin.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin Master não pode rebaixar a si mesmo.")
+
+    user_to_demote = crud.get_user_by_id(db, user_id=lider_id)
+    
+    if not user_to_demote:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+    
+    if user_to_demote.role != models.UserRole.lider:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este usuário não é um líder.")
         
     return crud.update_user_role(db=db, user_to_update=user_to_demote, new_role=models.UserRole.user)
+
+# NOVO: Endpoint para Admin Master designar um líder
+@app.put("/admin-master/sectors/{sector_id}/assign-lider", response_model=schemas.Sector)
+def assign_lider_endpoint(
+    sector_id: int,
+    lider_id: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Designa um Líder (usuário com role 'lider') como o líder de um setor. """
+    try:
+        return crud.assign_lider_to_sector(db=db, lider_id=lider_id, sector_id=sector_id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")

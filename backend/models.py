@@ -12,8 +12,9 @@ from database import Base # Importa a Base do nosso arquivo database.py
 
 # Define os ENUMs (tipos especiais) que o PostgreSQL usará
 class UserRole(enum.Enum):
-    admin = "admin"
-    user = "user"
+    admin = "0"   # Admin Master
+    lider = "1"   # Líder de Setor
+    user = "2"    # Usuário Padrão
 
 class ActivityType(enum.Enum):
     online = "online"
@@ -31,8 +32,19 @@ class Sector(Base):
     name = Column(String(100), nullable=False)
     invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
     
-    # Relacionamentos (o que este setor possui)
-    users = relationship("User", back_populates="sector")
+    #
+    # --- CORREÇÃO 1 ---
+    # Adicionamos 'use_alter=True' E um 'name' para a Chave Estrangeira
+    #
+    lider_id = Column(
+        Integer, 
+        ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), 
+        nullable=True
+    )
+    
+    # Relacionamentos do SQLAlchemy (lógica do Python)
+    lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
+    users = relationship("User", back_populates="sector", foreign_keys="[User.sector_id]")
     activities = relationship("Activity", back_populates="sector")
     redeem_codes = relationship("RedeemCode", back_populates="sector")
 
@@ -46,15 +58,32 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
     
-    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
+    # --- CORREÇÃO 2 ---
+    # Adicionamos um 'name' para a outra Chave Estrangeira
+    #
+    sector_id = Column(
+        Integer, 
+        ForeignKey("sectors.sector_id", name="fk_user_sector"), 
+        nullable=True
+    ) 
     
-    # Relacionamentos (a quem este usuário pertence)
-    sector = relationship("Sector", back_populates="users")
+    # Relacionamentos do SQLAlchemy (lógica do Python)
+    sector = relationship("Sector", back_populates="users", foreign_keys=[sector_id])
+    
+    led_sector = relationship(
+        "Sector", 
+        back_populates="lider", 
+        foreign_keys="[Sector.lider_id]", 
+        uselist=False
+    )
+
     checkins = relationship("CheckIn", back_populates="user")
     created_activities = relationship("Activity", back_populates="creator")
     created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
     assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
+
+# (O restante do arquivo: Activity, CheckIn, etc. está 100% correto)
 
 # Modelo da Tabela 'Activities' (Eventos/Atividades)
 class Activity(Base):
@@ -64,12 +93,12 @@ class Activity(Base):
     title = Column(String(150), nullable=False)
     description = Column(String, nullable=True)
     type = Column(Enum(ActivityType), nullable=False)
-    address = Column(String(255), nullable=True) # Só para presenciais
+    address = Column(String(255), nullable=True) 
     activity_date = Column(DateTime, nullable=False)
-    points_value = Column(Integer, nullable=False, default=10) # Pontos por presença
+    points_value = Column(Integer, nullable=False, default=10) 
     
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) # ID do Admin
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     
     sector = relationship("Sector", back_populates="activities")
     creator = relationship("User", back_populates="created_activities")
@@ -98,11 +127,10 @@ class RedeemCode(Base):
     points_value = Column(Integer, nullable=False, default=10)
     type = Column(Enum(CodeType), nullable=False)
     is_redeemed = Column(Boolean, default=False)
-    general_redemptions = relationship("GeneralCodeRedemption", back_populates="code")
-
+    
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) # Admin
-    assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) # Para tipo 'unique'
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
+    assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) 
 
     sector = relationship("Sector", back_populates="redeem_codes")
     creator = relationship("User", back_populates="created_codes", foreign_keys=[created_by])

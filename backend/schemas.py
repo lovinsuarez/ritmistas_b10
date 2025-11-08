@@ -2,8 +2,6 @@
 import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from datetime import datetime
 import uuid
 from models import UserRole # Importa o Enum do models
 
@@ -16,13 +14,23 @@ class TokenData(BaseModel):
     email: str | None = None
 
 # --- Schemas base para USUÁRIO ---
+
+# ALTERADO: Removida a classe 'NivelAcesso'
+# class NivelAcesso(BaseModel):
+#     nivel_acesso: int
+#     descricao: str
+
 class UserBase(BaseModel):
     email: EmailStr
     username: str
+    # ALTERADO: Removido o campo 'nivel_acesso'
+    # nivel_acesso: NivelAcesso 
+
 
 # Schema para Criar um Usuário (recebe senha)
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
+
 # Schema para Criar um Admin (recebe senha e nome do setor)
 class AdminCreate(UserCreate):
     sector_name: str
@@ -30,8 +38,10 @@ class AdminCreate(UserCreate):
 # Schema para exibir um Usuário (nunca mostrar a senha)
 class User(UserBase):
     user_id: int
-    sector_id: int
-    role: UserRole
+    role: UserRole # Este é o campo correto que vem do banco
+    
+    # ALTERADO: sector_id agora pode ser nulo
+    sector_id: int | None 
 
     model_config = ConfigDict(from_attributes=True) # Ajuda o Pydantic a ler dados do SQLAlchemy
 
@@ -40,6 +50,9 @@ class Sector(BaseModel):
     sector_id: int
     name: str
     invite_code: uuid.UUID
+    
+    # NOVO: Adiciona o ID do líder ao schema da API
+    lider_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
 

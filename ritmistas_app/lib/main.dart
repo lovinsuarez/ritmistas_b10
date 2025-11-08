@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
+import 'package:ritmistas_app/theme.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,32 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Ritmistas B10',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.amber,
-          primary: Colors.amber,
-          brightness: Brightness.light,
-          background: Colors.grey[100],
-        ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[100],
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.black,
-          selectedItemColor: Colors.amber,
-          unselectedItemColor: Colors.grey,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
-      ),
+      theme: appTheme,
       debugShowCheckedModeBanner: false,
       home: const LoginPage(),
     );
@@ -49,8 +25,8 @@ class MyApp extends StatelessWidget {
 
 // --- TELA DE LOGIN / REGISTRO ---
 
-// Define os 3 modos da tela
-enum AuthMode { login, registerUser, registerAdmin }
+// ALTERADO: O modo 'registerAdmin' agora é 'registerAdminMaster'
+enum AuthMode { login, registerUser, registerAdminMaster }
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -69,7 +45,8 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
-  final _sectorNameController = TextEditingController();
+  // ALTERADO: Removido o controller do nome do setor
+  // final _sectorNameController = TextEditingController();
   final _inviteCodeController = TextEditingController();
 
   // --- FUNÇÕES DE LÓGICA ---
@@ -87,7 +64,9 @@ class _LoginPageState extends State<LoginPage> {
 
       // 2. Com o token, busca os dados do usuário (para saber o ROLE)
       final userData = await _apiService.getUsersMe(token);
-      final String userRole = userData['role']; // 'admin' ou 'user'
+
+      // ALTERADO: O backend agora retorna '0' (admin), '1' (lider), '2' (user)
+      final String userRole = userData['role'];
 
       // 3. Salva o token E o role
       final prefs = await SharedPreferences.getInstance();
@@ -127,25 +106,28 @@ class _LoginPageState extends State<LoginPage> {
         throw Exception("A senha deve ter entre 8 e 72 caracteres.");
       }
 
-      // --- Lógica de Registro (Admin ou Usuário) ---
-      if (_authMode == AuthMode.registerAdmin) {
-        final sectorName = _sectorNameController.text;
-        if (sectorName.isEmpty) {
-          throw Exception("Nome do Setor é obrigatório.");
-        }
-        await _apiService.registerAdmin(
+      // --- Lógica de Registro (Admin Master ou Usuário) ---
+      // ALTERADO: Lógica para o Admin Master
+      if (_authMode == AuthMode.registerAdminMaster) {
+        // Removemos a verificação do nome do setor
+        // final sectorName = _sectorNameController.text;
+        // if (sectorName.isEmpty) {
+        //   throw Exception("Nome do Setor é obrigatório.");
+        // }
+
+        // Chama a nova função de 'registerAdminMaster'
+        await _apiService.registerAdminMaster(
           email: email,
           password: password,
           username: username,
-          sectorName: sectorName,
+          // sectorName: sectorName, <-- Não é mais necessário
         );
       } else {
-        // registerUser
+        // registerUser (Esta lógica permanece a mesma)
         final inviteCode = _inviteCodeController.text;
         if (inviteCode.isEmpty) {
           throw Exception("Código de Convite é obrigatório.");
         }
-        // Chama a nova função
         await _apiService.registerUser(
           email: email,
           password: password,
@@ -212,13 +194,9 @@ class _LoginPageState extends State<LoginPage> {
             _emailController,
             'Email',
             keyboardType: TextInputType.emailAddress,
-          ), // <-- CORRIGIDO
+          ),
           const SizedBox(height: 16),
-          _buildTextField(
-            _passwordController,
-            'Senha',
-            obscureText: true,
-          ), // <-- CORRIGIDO
+          _buildTextField(_passwordController, 'Senha', obscureText: true),
         ];
         primaryButton = _buildPrimaryButton('Entrar', _handleLogin);
         secondaryButton = Column(
@@ -227,9 +205,10 @@ class _LoginPageState extends State<LoginPage> {
               'Não tem uma conta? Registrar Usuário',
               () => _switchAuthMode(AuthMode.registerUser),
             ),
+            // ALTERADO: Texto do botão
             _buildTextButton(
-              'Registrar como Admin',
-              () => _switchAuthMode(AuthMode.registerAdmin),
+              'Registrar como Admin Master',
+              () => _switchAuthMode(AuthMode.registerAdminMaster),
             ),
           ],
         );
@@ -243,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
             _emailController,
             'Email',
             keyboardType: TextInputType.emailAddress,
-          ), // <-- CORRIGIDO
+          ),
           const SizedBox(height: 16),
           _buildTextField(_usernameController, 'Seu Nome'),
           const SizedBox(height: 16),
@@ -254,7 +233,7 @@ class _LoginPageState extends State<LoginPage> {
             'Senha',
             obscureText: true,
             helperText: 'Mín 8, máx 72 caracteres',
-          ), // <-- CORRIGIDO
+          ),
         ];
         primaryButton = _buildPrimaryButton(
           'Registrar e Entrar',
@@ -266,29 +245,31 @@ class _LoginPageState extends State<LoginPage> {
         );
         break;
 
-      // --- MODO REGISTRO DE ADMIN ---
-      case AuthMode.registerAdmin:
-        title = 'Registrar Admin';
+      // --- MODO REGISTRO DE ADMIN MASTER ---
+      // ALTERADO: Lógica do formulário de Admin
+      case AuthMode.registerAdminMaster:
+        title = 'Registrar Admin Master';
         formFields = [
           _buildTextField(
             _emailController,
             'Email',
             keyboardType: TextInputType.emailAddress,
-          ), // <-- CORRIGIDO
+          ),
           const SizedBox(height: 16),
           _buildTextField(_usernameController, 'Seu Nome'),
           const SizedBox(height: 16),
-          _buildTextField(
-            _sectorNameController,
-            'Nome do Setor (Ex: Bateria B10)',
-          ),
-          const SizedBox(height: 16),
+          // REMOVIDO: Campo 'Nome do Setor'
+          // _buildTextField(
+          //   _sectorNameController,
+          //   'Nome do Setor (Ex: Bateria B10)',
+          // ),
+          // const SizedBox(height: 16),
           _buildTextField(
             _passwordController,
             'Senha',
             obscureText: true,
             helperText: 'Mín 8, máx 72 caracteres',
-          ), // <-- CORRIGIDO
+          ),
         ];
         primaryButton = _buildPrimaryButton(
           'Registrar e Entrar',
@@ -337,8 +318,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // --- Widgets Helpers ---
-
-  // AQUI ESTÁ A DEFINIÇÃO CORRIGIDA (com chaves {}):
   Widget _buildTextField(
     TextEditingController controller,
     String label, {
@@ -360,13 +339,15 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildPrimaryButton(String text, VoidCallback onPressed) {
     return ElevatedButton(
-      onPressed: onPressed,
+      onPressed: _isLoading
+          ? null
+          : onPressed, // Desabilita se estiver carregando
       child: _isLoading
           ? const SizedBox(
               height: 20,
               width: 20,
               child: CircularProgressIndicator(
-                color: Colors.black,
+                color: Colors.black, // Corrigido para o tema
                 strokeWidth: 2,
               ),
             )
@@ -376,11 +357,13 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildTextButton(String text, VoidCallback onPressed) {
     return TextButton(
-      onPressed: onPressed,
+      onPressed: _isLoading
+          ? null
+          : onPressed, // Desabilita se estiver carregando
       child: Text(
         text,
         style: TextStyle(color: Theme.of(context).colorScheme.primary),
       ),
     );
   }
-} // <-- Este é o '}' final da classe _LoginPageState
+}

@@ -7,30 +7,22 @@ def get_user_by_email(db: Session, email: str):
     """Busca um usuário pelo email."""
     return db.query(models.User).filter(models.User.email == email).first()
 
-def create_admin_and_sector(db: Session, admin_data: schemas.AdminCreate):
+# ALTERADO: Esta função agora cria o Admin Master, sem vínculo a um setor.
+def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     """
-    Cria um novo Setor e um novo Usuário Admin,
-    associando um ao outro.
+    Cria um novo Usuário Admin Master (sem setor).
     """
     
-    # 1. Criptografa a senha do admin
+    # 1. Criptografa a senha
     hashed_password = security.get_password_hash(admin_data.password)
-    
-    # 2. Cria a nova entidade Setor
-    db_sector = models.Sector(name=admin_data.sector_name)
-    
-    # Adiciona na sessão (prepara para salvar)
-    db.add(db_sector)
-    db.commit() # Salva no banco
-    db.refresh(db_sector) # Pega o ID gerado pelo banco
-    
-    # 3. Cria a nova entidade Usuário Admin
+        
+    # 2. Cria a nova entidade Usuário Admin
     db_admin = models.User(
         email=admin_data.email,
         username=admin_data.username,
         hashed_password=hashed_password,
         role=models.UserRole.admin,
-        sector_id=db_sector.sector_id # Associa ao setor que acabamos de criar
+        sector_id=None # Admin Master não tem setor
     )
     
     db.add(db_admin)
@@ -85,26 +77,28 @@ def redeem_code(db: Session, user: models.User, code: models.RedeemCode):
 
     return "Tipo de código desconhecido."
 
-def create_general_code(db: Session, code_data: schemas.CodeCreateGeneral, admin: models.User):
+# ALTERADO: O parâmetro 'admin' agora se chama 'creator' (será um Líder)
+def create_general_code(db: Session, code_data: schemas.CodeCreateGeneral, creator: models.User):
     new_code = models.RedeemCode(
         code_string=code_data.code_string,
         points_value=code_data.points_value,
         type=models.CodeType.general,
-        sector_id=admin.sector_id,
-        created_by=admin.user_id
+        sector_id=creator.sector_id,
+        created_by=creator.user_id
     )
     db.add(new_code)
     db.commit()
     db.refresh(new_code)
     return new_code
 
-def create_unique_code(db: Session, code_data: schemas.CodeCreateUnique, admin: models.User):
+# ALTERADO: O parâmetro 'admin' agora se chama 'creator' (será um Líder)
+def create_unique_code(db: Session, code_data: schemas.CodeCreateUnique, creator: models.User):
     new_code = models.RedeemCode(
         code_string=code_data.code_string,
         points_value=code_data.points_value,
         type=models.CodeType.unique,
-        sector_id=admin.sector_id,
-        created_by=admin.user_id,
+        sector_id=creator.sector_id,
+        created_by=creator.user_id,
         assigned_user_id=code_data.assigned_user_id
     )
     db.add(new_code)
@@ -150,7 +144,6 @@ def get_sector_ranking(db: Session, sector_id: int):
     """
 
     # 1. Pontos de Check-in (Presença)
-    # Agrupa os CheckIns por usuário e soma os 'points_value' das atividades
     checkin_points_sq = db.query(
         models.CheckIn.user_id,
         func.sum(models.Activity.points_value).label("total_checkin_points")
@@ -234,8 +227,9 @@ def get_sector_by_id(db: Session, sector_id: int):
     """Busca um setor pelo seu ID."""
     return db.query(models.Sector).filter(models.Sector.sector_id == sector_id).first()
 
-def create_activity(db: Session, activity_data: schemas.ActivityCreate, admin: models.User):
-    """Cria uma nova atividade associada a um admin e seu setor."""
+# ALTERADO: O parâmetro 'admin' agora se chama 'creator' (será um Líder)
+def create_activity(db: Session, activity_data: schemas.ActivityCreate, creator: models.User):
+    """Cria uma nova atividade associada a um líder e seu setor."""
 
     # Regra de negócio: endereço obrigatório se for presencial
     if activity_data.type == models.ActivityType.presencial and not activity_data.address:
@@ -248,8 +242,8 @@ def create_activity(db: Session, activity_data: schemas.ActivityCreate, admin: m
         address=activity_data.address,
         activity_date=activity_data.activity_date,
         points_value=activity_data.points_value,
-        sector_id=admin.sector_id,
-        created_by=admin.user_id
+        sector_id=creator.sector_id,
+        created_by=creator.user_id
     )
     db.add(new_activity)
     db.commit()
@@ -353,3 +347,104 @@ def get_user_dashboard_details(db: Session, user_id: int, sector_id: int):
     }
 
     return dashboard_data
+
+# --- NOVAS FUNÇÕES CRUD ---
+
+# NOVO: Função para o Admin Master criar um setor
+def create_sector(db: Session, sector_name: str):
+    """Cria um novo Setor."""
+    db_sector = models.Sector(name=sector_name)
+    db.add(db_sector)
+    db.commit()
+    db.refresh(db_sector)
+    return db_sector
+
+# NOVO: Função para o Admin Master ver todos os setores
+def get_all_sectors(db: Session):
+    """Retorna todos os setores."""
+    return db.query(models.Sector).all()
+
+# NOVO: Função para o Admin Master ver todos os Líderes
+def get_liders(db: Session):
+    """Retorna todos os usuários com a função 'lider'."""
+    return db.query(models.User).filter(models.User.role == models.UserRole.lider).all()
+
+# NOVO: Função para o Admin Master designar um Líder a um Setor
+def assign_lider_to_sector(db: Session, lider_id: int, sector_id: int):
+    """Designa um usuário (Líder) como o líder de um setor."""
+    
+    # 1. Busca o setor
+    db_sector = db.query(models.Sector).filter(models.Sector.sector_id == sector_id).first()
+    if not db_sector:
+        raise HTTPException(status_code=404, detail="Setor não encontrado.")
+    
+    # 2. Busca o usuário (que deve ser um líder)
+    db_lider = db.query(models.User).filter(models.User.user_id == lider_id).first()
+    if not db_lider:
+        raise HTTPException(status_code=404, detail="Usuário líder não encontrado.")
+    if db_lider.role != models.UserRole.lider:
+        raise HTTPException(status_code=400, detail="Este usuário não é um Líder.")
+
+    # 3. Atribui o líder ao setor
+    db_sector.lider_id = db_lider.user_id
+    
+    # 4. (Opcional) Move o líder para o setor que ele agora lidera
+    db_lider.sector_id = db_sector.sector_id 
+    
+    db.commit()
+    db.refresh(db_sector)
+    return db_sector
+
+# NOVO: Função para o Ranking Geral (B10)
+def get_geral_ranking(db: Session):
+    """
+    Calcula o ranking completo de TODOS os usuários,
+    somando pontos de check-ins e códigos resgatados.
+    """
+
+    # 1. Pontos de Check-in (Presença)
+    checkin_points_sq = db.query(
+        models.CheckIn.user_id,
+        func.sum(models.Activity.points_value).label("total_checkin_points")
+    ).join(models.Activity, models.CheckIn.activity_id == models.Activity.activity_id)\
+     .group_by(models.CheckIn.user_id)\
+     .subquery()
+
+    # 2. Pontos de Códigos 'Unique' resgatados
+    unique_code_points_sq = db.query(
+        models.RedeemCode.assigned_user_id.label("user_id"),
+        func.sum(models.RedeemCode.points_value).label("total_unique_points")
+    ).filter(
+        models.RedeemCode.type == models.CodeType.unique,
+        models.RedeemCode.is_redeemed == True
+    ).group_by(models.RedeemCode.assigned_user_id)\
+     .subquery()
+
+    # 3. Pontos de Códigos 'General' resgatados
+    general_code_points_sq = db.query(
+        models.GeneralCodeRedemption.user_id,
+        func.sum(models.RedeemCode.points_value).label("total_general_points")
+    ).join(models.RedeemCode, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
+     .group_by(models.GeneralCodeRedemption.user_id)\
+     .subquery()
+
+    # 4. Cria a coluna de pontos totais como uma variável
+    total_points_col = (
+        func.coalesce(checkin_points_sq.c.total_checkin_points, 0) +
+        func.coalesce(unique_code_points_sq.c.total_unique_points, 0) +
+        func.coalesce(general_code_points_sq.c.total_general_points, 0)
+    ).label("total_points")
+
+    # 5. Junta tudo com a tabela de Usuários
+    # ALTERADO: Removido o filtro de 'sector_id'
+    ranking_query = db.query(
+        models.User.user_id,
+        models.User.username,
+        total_points_col 
+    ).outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)\
+    .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)\
+    .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)\
+    .filter(models.User.sector_id == sector_id)\
+    .order_by(total_points_col.desc()) # <-- A linha vermelha
+
+    return ranking_query.all()

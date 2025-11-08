@@ -6,6 +6,7 @@ import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // --- Modelo de dados para o ranking ---
+// (Sem alterações, está correto)
 class RankingEntry {
   final int userId;
   final String username;
@@ -51,7 +52,9 @@ class _AdminRankingPageState extends State<AdminRankingPage> {
       if (token == null) {
         throw Exception("Usuário não autenticado.");
       }
-      return await _apiService.getRanking(token);
+
+      // ALTERADO: Chamando a função correta para o ranking do SETOR
+      return await _apiService.getSectorRanking(token);
     } catch (e) {
       rethrow;
     }
@@ -77,7 +80,10 @@ class _AdminRankingPageState extends State<AdminRankingPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Erro ao carregar ranking: ${snapshot.error}'),
+                  // ALTERADO: Limpa a mensagem de erro
+                  Text(
+                    'Erro ao carregar ranking: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _refreshRanking,
@@ -102,16 +108,12 @@ class _AdminRankingPageState extends State<AdminRankingPage> {
             return RefreshIndicator(
               onRefresh: _refreshRanking,
               child: ListView.builder(
-                padding: const EdgeInsets.only(
-                  top: 8.0,
-                  bottom: 8.0,
-                ), // Adiciona espaço
+                padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
                 itemCount: ranking.length,
                 itemBuilder: (context, index) {
                   final entry = ranking[index];
                   final position = index + 1;
 
-                  // --- NOVO DESIGN COM CARD (Sem destaque) ---
                   return Card(
                     elevation: 2.0,
                     margin: const EdgeInsets.symmetric(

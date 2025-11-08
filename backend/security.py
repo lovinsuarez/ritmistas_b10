@@ -9,6 +9,9 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 import schemas # Importa os schemas que criamos
 
+# NOVO: Importar os modelos User e UserRole
+from models import User, UserRole
+
 # --- Configuração de Autenticação ---
 
 # 1. Configuração de Hashing de Senha (usando bcrypt)
@@ -21,6 +24,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 dias
 # Esta é a URL que o FastAPI usará para saber "como" o usuário faz login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
 # --- Funções de Segurança ---
 
 def verify_password(plain_password, hashed_password):
@@ -59,10 +63,11 @@ def decode_token(token: str) -> schemas.TokenData | None:
         return schemas.TokenData(email=email)
     except JWTError:
         return None
+
 def get_current_user(
     token: str = Depends(oauth2_scheme), 
     db: Session = Depends(database.get_db)
-):
+) -> User: # ALTERADO: Adicionado o tipo de retorno '-> User' para clareza
     """
     Dependência para obter o usuário logado atualmente.
     Decodifica o token, busca o usuário no banco e o retorna.
@@ -82,3 +87,29 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+# --- NOVAS DEPENDÊNCIAS DE AUTORIZAÇÃO ---
+
+def get_current_lider(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependência que verifica se o usuário é LÍDER ou ADMIN MASTER.
+    (Líder = "1", Admin = "0")
+    """
+    if current_user.role not in [UserRole.lider, UserRole.admin]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado: Requer permissão de Líder ou Admin Master",
+        )
+    return current_user
+
+def get_current_admin_master(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependência que verifica se o usuário é ADMIN MASTER.
+    (Admin = "0")
+    """
+    if current_user.role != UserRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado: Requer permissão de Admin Master",
+        )
+    return current_user
