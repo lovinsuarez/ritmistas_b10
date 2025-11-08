@@ -448,3 +448,8 @@ def get_geral_ranking(db: Session):
     .order_by(total_points_col.desc()) # <-- A linha vermelha
 
     return ranking_query.all()
+
+# NOVO: Função para o Admin Master ver TODOS os usuários
+def get_all_users(db: Session):
+    """Retorna todos os usuários com a função 'user'."""
+    return db.query(models.User).filter(models.User.role == models.UserRole.user).all()

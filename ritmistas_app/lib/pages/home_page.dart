@@ -11,6 +11,8 @@ import 'package:ritmistas_app/pages/resgate_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ritmistas_app/main.dart'; // Para o LoginPage
 import 'package:ritmistas_app/widgets/shared_widgets.dart';
+import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
+import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -239,15 +241,8 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
   // TODO: Crie as páginas para o Admin Master
   // Por enquanto, usaremos placeholders
   static final List<Widget> _widgetOptions = <Widget>[
-    // 1. Página para Gerenciar Setores (Criar, Ver, Designar Líder)
-    // Precisaremos criar este arquivo: 'admin_master_setores_page.dart'
-    const Center(child: Text("Página: Gerenciar Setores (WIP)")),
-
-    // 2. Página para Gerenciar Líderes (Promover Usuário, Ver Líderes)
-    // Precisaremos criar este arquivo: 'admin_master_lideres_page.dart'
-    const Center(child: Text("Página: Gerenciar Líderes (WIP)")),
-
-    // 3. Página de Perfil (Reutilizada)
+    const AdminMasterSetoresPage(),
+    const AdminMasterLideresPage(), // <-- Esta é a nova página
     const PerfilPage(),
   ];
 

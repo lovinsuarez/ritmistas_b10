@@ -460,6 +460,22 @@ class ApiService {
       throw Exception(errorData['detail'] ?? 'Falha ao rebaixar líder');
     }
   }
+  
+  // NOVO: Listar todos os Usuários (para promover)
+  Future<List<UserAdminView>> getAllUsers(String token) async {
+    final url = Uri.parse('$_baseUrl/admin-master/users');
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => UserAdminView.fromJson(json)).toList();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['detail'] ?? 'Falha ao buscar todos os usuários');
+    }
+  }
 
   // NOVO: Designar Líder a um Setor
   Future<void> assignLiderToSector(

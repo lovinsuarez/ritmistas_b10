@@ -506,3 +506,13 @@ def assign_lider_endpoint(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+    
+
+# NOVO: Endpoint para Admin Master ver todos os usuários (para promover)
+@app.get("/admin-master/users", response_model=List[schemas.UserAdminView])
+def get_all_users_endpoint(
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Lista todos os usuários comuns (role 'user'). """
+    return crud.get_all_users(db=db)
