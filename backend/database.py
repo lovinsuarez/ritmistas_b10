@@ -8,8 +8,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 
-from database import Base # Importa a Base do nosso arquivo database.py
-
 # Define os ENUMs (tipos especiais) que o PostgreSQL usará
 class UserRole(enum.Enum):
     admin = "0"   # Admin Master
