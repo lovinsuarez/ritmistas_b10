@@ -1,9 +1,9 @@
 // lib/pages/admin_master_setores_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/services/api_service.dart'; // Importa nosso serviço de API
+import 'package:flutter/services.dart'; // Para o Clipboard
+import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
 import 'package:ritmistas_app/pages/admin_master_setor_detalhe_page.dart';
 
 class AdminMasterSetoresPage extends StatefulWidget {
@@ -15,33 +15,47 @@ class AdminMasterSetoresPage extends StatefulWidget {
 
 class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
     with AutomaticKeepAliveClientMixin {
-  // AutomaticKeepAliveClientMixin mantém o estado da aba
   final ApiService _apiService = ApiService();
   final _sectorNameController = TextEditingController();
-  late Future<List<Sector>> _sectorsFuture;
+
+  // ALTERADO: Este 'Future' agora vai carregar DOIS conjuntos de dados
+  late Future<Map<String, dynamic>> _dataFuture;
+
   String? _token;
   bool _isCreating = false;
 
   @override
   void initState() {
     super.initState();
-    // Carrega o token e busca os setores
-    _sectorsFuture = _loadSectors();
+    _dataFuture = _loadData();
   }
 
-  Future<List<Sector>> _loadSectors() async {
+  // ALTERADO: Esta função agora busca setores E líderes
+  Future<Map<String, dynamic>> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('access_token');
     if (_token == null) {
       throw Exception("Admin Master não autenticado.");
     }
-    return _apiService.getAllSectors(_token!);
+
+    // Roda as duas chamadas de API em paralelo
+    final results = await Future.wait([
+      _apiService.getAllSectors(_token!),
+      _apiService.getAllLiders(_token!),
+    ]);
+
+    return {
+      'sectors': results[0] as List<Sector>,
+      'liders': results[1] as List<UserAdminView>,
+    };
   }
 
-  Future<void> _refreshSectors() async {
+  Future<void> _refreshData() async {
     setState(() {
-      _sectorsFuture = _loadSectors();
+      _dataFuture = _loadData();
     });
+    // Espera o futuro terminar para o RefreshIndicator
+    await _dataFuture;
   }
 
   void _showError(String message) {
@@ -72,7 +86,7 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
         );
       }
       _sectorNameController.clear();
-      _refreshSectors(); // Atualiza a lista de setores
+      _refreshData(); // Atualiza os dados
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -82,16 +96,29 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
     }
   }
 
+  // NOVO: Função helper para encontrar o nome do líder
+  String _getLiderName(List<UserAdminView> liders, int? liderId) {
+    if (liderId == null) return 'Nenhum';
+    try {
+      // Procura na lista de líderes o ID correspondente
+      final lider = liders.firstWhere((l) => l.userId == liderId);
+      return lider.username;
+    } catch (e) {
+      // Se não encontrar (ex: líder foi deletado), retorna 'Desconhecido'
+      return 'Desconhecido (ID: $liderId)';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Obrigatório para AutomaticKeepAliveClientMixin
+    super.build(context);
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- 1. Formulário de Criação ---
+            // --- 1. Formulário de Criação (Sem alteração) ---
             Card(
               elevation: 2,
               child: Padding(
@@ -134,8 +161,10 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const Divider(),
-            FutureBuilder<List<Sector>>(
-              future: _sectorsFuture,
+
+            // ALTERADO: O FutureBuilder agora espera o Map
+            FutureBuilder<Map<String, dynamic>>(
+              future: _dataFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -145,63 +174,81 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                     child: Text('Erro ao carregar setores: ${snapshot.error}'),
                   );
                 }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                if (!snapshot.hasData || snapshot.data!['sectors'].isEmpty) {
                   return const Center(
                       child: Text('Nenhum setor criado ainda.'));
                 }
 
-                final sectors = snapshot.data!;
-                return ListView.builder(
-                  shrinkWrap:
-                      true, // Para o ListView funcionar dentro do Column
-                  physics:
-                      const NeverScrollableScrollPhysics(), // Desabilita scroll
-                  itemCount: sectors.length,
-                  itemBuilder: (context, index) {
-                    final sector = sectors[index];
-                    return Card(
-                      child: ListTile(
-                        title: Text(sector.name),
-                        subtitle: Text(
-                          'Código: ${sector.inviteCode}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.copy),
-                          tooltip: 'Copiar Código',
-                          onPressed: () {
-                            Clipboard.setData(
-                                ClipboardData(text: sector.inviteCode));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Código de convite copiado!'),
-                                backgroundColor: Colors.blue,
+                // Descompacta os dados
+                final List<Sector> sectors = snapshot.data!['sectors'];
+                final List<UserAdminView> liders = snapshot.data!['liders'];
+
+                return RefreshIndicator(
+                  onRefresh: _refreshData,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: sectors.length,
+                    itemBuilder: (context, index) {
+                      final sector = sectors[index];
+                      // Encontra o nome do líder usando a função helper
+                      final String liderName =
+                          _getLiderName(liders, sector.liderId);
+
+                      // ALTERADO: O ListTile foi atualizado
+                      return Card(
+                        child: ListTile(
+                          title: Text(sector.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Mostra o NOME do Líder
+                              Text(
+                                'Líder: $liderName',
+                                style: TextStyle(
+                                    color: liderName == 'Nenhum'
+                                        ? Colors.grey
+                                        : Colors.black),
+                              ),
+                              // Mostra o Código de Convite
+                              Text('Código: ${sector.inviteCode}'),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.copy),
+                            tooltip: 'Copiar Código',
+                            onPressed: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: sector.inviteCode));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Código de convite copiado!'),
+                                  backgroundColor: Colors.blue,
+                                ),
+                              );
+                            },
+                          ),
+                          onTap: () async {
+                            final bool? mudancaFeita =
+                                await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    AdminMasterSetorDetalhePage(
+                                  sector: sector,
+                                ),
                               ),
                             );
+
+                            if (mudancaFeita == true) {
+                              _refreshData(); // Recarrega setores E líderes
+                            }
                           },
                         ),
-                        // ADICIONADO: Ação de clique no item
-                        onTap: () async {
-                          // <-- Torna a função 'async'
-                          // 'await' espera a página de detalhes ser fechada
-                          final bool? mudancaFeita =
-                              await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (context) => AdminMasterSetorDetalhePage(
-                                sector:
-                                    sector, // Passa o objeto 'sector' para a nova página
-                              ),
-                            ),
-                          );
-
-                          // Se a página de detalhes retornou 'true', recarrega a lista
-                          if (mudancaFeita == true) {
-                            _refreshSectors();
-                          }
-                        },
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -212,5 +259,5 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
   }
 
   @override
-  bool get wantKeepAlive => true; // Mantém o estado da aba
+  bool get wantKeepAlive => true;
 }
