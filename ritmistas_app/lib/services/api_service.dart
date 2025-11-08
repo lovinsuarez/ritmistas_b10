@@ -460,7 +460,7 @@ class ApiService {
       throw Exception(errorData['detail'] ?? 'Falha ao rebaixar líder');
     }
   }
-  
+
   // NOVO: Listar todos os Usuários (para promover)
   Future<List<UserAdminView>> getAllUsers(String token) async {
     final url = Uri.parse('$_baseUrl/admin-master/users');
@@ -473,7 +473,8 @@ class ApiService {
       return data.map((json) => UserAdminView.fromJson(json)).toList();
     } else {
       final errorData = jsonDecode(response.body);
-      throw Exception(errorData['detail'] ?? 'Falha ao buscar todos os usuários');
+      throw Exception(
+          errorData['detail'] ?? 'Falha ao buscar todos os usuários');
     }
   }
 
@@ -500,32 +501,40 @@ class ApiService {
     }
   }
 
-  // --- Funções antigas de Admin (agora do Admin Master) ---
-  // (Estas são as funções que o Líder NÃO pode fazer)
+  // --- NOVAS FUNÇÕES PARA ADMIN MASTER VER DETALHES DO SETOR ---
 
-  // (Movido para Admin Master)
-  Future<void> promoteUser(String token, int userId) async {
-    final url = Uri.parse('$_baseUrl/admin/users/$userId/promote');
-    final response = await http.put(
+  // NOVO: [Admin Master] Lista usuários de um setor específico
+  Future<List<UserAdminView>> getUsersForSector(
+      String token, int sectorId) async {
+    final url = Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/users');
+    final response = await http.get(
       url,
       headers: {"Authorization": "Bearer $token"},
     );
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => UserAdminView.fromJson(json)).toList();
+    } else {
       final errorData = jsonDecode(response.body);
-      throw Exception(errorData['detail'] ?? 'Falha ao promover usuário');
+      throw Exception(
+          errorData['detail'] ?? 'Falha ao buscar usuários do setor');
     }
   }
 
-  // (Movido para Admin Master)
-  Future<void> demoteUser(String token, int userId) async {
-    final url = Uri.parse('$_baseUrl/admin/users/$userId/demote');
-    final response = await http.put(
+  // NOVO: [Admin Master] Busca o ranking de um setor específico
+  Future<Map<String, dynamic>> getRankingForSector(
+      String token, int sectorId) async {
+    final url = Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/ranking');
+    final response = await http.get(
       url,
       headers: {"Authorization": "Bearer $token"},
     );
-    if (response.statusCode != 200) {
-      final errorData = jsonDecode(response.body);
-      throw Exception(errorData['detail'] ?? 'Falha ao rebaixar usuário');
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return data;
+    } else {
+      // A linha deve usar a variável 'data'
+      throw Exception(data['detail'] ?? 'Falha ao buscar ranking do setor');
     }
   }
 }

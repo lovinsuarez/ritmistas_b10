@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/services/api_service.dart'; // Importa nosso serviço de API
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:ritmistas_app/pages/admin_master_setor_detalhe_page.dart';
 
 class AdminMasterSetoresPage extends StatefulWidget {
   const AdminMasterSetoresPage({super.key});
@@ -161,12 +162,10 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                     return Card(
                       child: ListTile(
                         title: Text(sector.name),
-                        // ALTERADO: O subtítulo agora mostra o código de convite
                         subtitle: Text(
                           'Código: ${sector.inviteCode}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        // ALTERADO: O 'trailing' agora é um botão de COPIAR
                         trailing: IconButton(
                           icon: const Icon(Icons.copy),
                           tooltip: 'Copiar Código',
@@ -181,7 +180,17 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                             );
                           },
                         ),
-                        // TODO: Podemos mover o botão "Designar Líder" para outro lugar
+                        // ADICIONADO: Ação de clique no item
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => AdminMasterSetorDetalhePage(
+                                sector:
+                                    sector, // Passa o objeto 'sector' para a nova página
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
