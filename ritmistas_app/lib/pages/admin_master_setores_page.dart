@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/services/api_service.dart'; // Importa nosso serviço de API
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class AdminMasterSetoresPage extends StatefulWidget {
   const AdminMasterSetoresPage({super.key});
@@ -160,18 +161,27 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                     return Card(
                       child: ListTile(
                         title: Text(sector.name),
+                        // ALTERADO: O subtítulo agora mostra o código de convite
                         subtitle: Text(
-                          'ID do Líder: ${sector.liderId ?? 'Nenhum'}',
+                          'Código: ${sector.inviteCode}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        // TODO: Adicionar um botão para designar líder
+                        // ALTERADO: O 'trailing' agora é um botão de COPIAR
                         trailing: IconButton(
-                          icon: const Icon(Icons.person_add),
-                          tooltip: 'Designar Líder',
+                          icon: const Icon(Icons.copy),
+                          tooltip: 'Copiar Código',
                           onPressed: () {
-                            // TODO: Implementar lógica de designar líder
-                            _showError('Função ainda não implementada.');
+                            Clipboard.setData(
+                                ClipboardData(text: sector.inviteCode));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Código de convite copiado!'),
+                                backgroundColor: Colors.blue,
+                              ),
+                            );
                           },
                         ),
+                        // TODO: Podemos mover o botão "Designar Líder" para outro lugar
                       ),
                     );
                   },

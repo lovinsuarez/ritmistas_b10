@@ -516,3 +516,39 @@ def get_all_users_endpoint(
 ):
     """ [Admin Master] Lista todos os usuários comuns (role 'user'). """
     return crud.get_all_users(db=db)
+
+# --- INÍCIO DAS NOVAS ROTAS PARA ADMIN MASTER VER DETALHES DO SETOR ---
+
+# NOVO: Endpoint para Admin Master ver os usuários de UM setor
+@app.get("/admin-master/sectors/{sector_id}/users", response_model=List[schemas.UserAdminView])
+def get_sector_users_admin_endpoint(
+    sector_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Lista todos os usuários de um setor específico. """
+    # Reutiliza a função do CRUD. Verifica se o setor existe primeiro.
+    sector = crud.get_sector_by_id(db, sector_id=sector_id)
+    if not sector:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
+    
+    return crud.get_users_by_sector(db=db, sector_id=sector_id)
+
+# NOVO: Endpoint para Admin Master ver o ranking de UM setor
+@app.get("/admin-master/sectors/{sector_id}/ranking", response_model=schemas.RankingResponse)
+def get_sector_ranking_admin_endpoint(
+    sector_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(security.get_current_admin_master)
+):
+    """ [Admin Master] Retorna o ranking de um setor específico. """
+    # Reutiliza a função do CRUD. Verifica se o setor existe primeiro.
+    sector = crud.get_sector_by_id(db, sector_id=sector_id)
+    if not sector:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
+
+    ranking_data = crud.get_sector_ranking(db=db, sector_id=sector_id)
+    return {
+        "my_user_id": current_admin.user_id, # O Admin Master pode se ver no ranking se participar
+        "ranking": ranking_data
+    }
