@@ -66,7 +66,7 @@ class Sector {
   final int sectorId;
   final String name;
   final String
-  inviteCode; // O backend manda como UUID, mas o http trata como String
+      inviteCode; // O backend manda como UUID, mas o http trata como String
   final int? liderId;
 
   Sector({
@@ -92,7 +92,7 @@ class Sector {
 
 class ApiService {
   // Esta URL está CORRETA, conforme sua confirmação anterior
-  static const String _baseUrl = "https://ritmistas-b10.onrender.com";
+  static const String _baseUrl = "https://ritmistas-api.onrender.com";
 
   // --- Funções de Auth ---
 
