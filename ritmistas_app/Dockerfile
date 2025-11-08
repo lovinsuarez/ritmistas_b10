@@ -1,6 +1,6 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
 # MUDANÇA FINAL: Usando a imagem 'instrumentisto' que TEM a tag de versão
-FROM ghcr.io/fluttercommunity/flutter:stable AS build
+FROM instrumentisto/flutter:3.19.6 AS build
 
 # Define o diretório de trabalho
 WORKDIR /app
