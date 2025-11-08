@@ -1,20 +1,18 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
 # MUDANÇA FINAL: Usando a imagem 'instrumentisto' que TEM a tag de versão
-FROM instrumentisto/flutter:3.19.6 AS build
+FROM instrumentisto/flutter:3.22.2 AS build
 
 # Define o diretório de trabalho
 WORKDIR /app
 
 # Copia os arquivos de dependência
-COPY pubspec.yaml pubspec.lock ./
-
-# Remove o lockfile para forçar uma resolução limpa.
-RUN rm -f pubspec.lock
+# (Não copiamos o .lock para forçar uma resolução limpa)
+COPY pubspec.yaml ./
 
 # Instala as dependências
 RUN flutter pub get
 
-# Agora copia apenas os diretórios necessários para o build
+# Agora copia o resto do código-fonte do app
 COPY lib/ ./lib/
 COPY web/ ./web/
 # Se você tiver uma pasta 'assets', descomente a linha abaixo
@@ -28,6 +26,10 @@ FROM nginx:alpine as final
 
 # Copia APENAS os arquivos construídos do Estágio 1 para o servidor web
 COPY --from=build /app/build/web /usr/share/nginx/html
+
+# (Opcional, mas recomendado) Copia a configuração do Nginx
+# Se você não tiver o nginx.conf, pode apagar esta linha
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expõe a porta 80 (padrão do Nginx)
 EXPOSE 80
