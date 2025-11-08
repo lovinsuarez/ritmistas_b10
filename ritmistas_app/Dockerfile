@@ -1,6 +1,6 @@
 # ESTÁGIO 1: Construir o App (Build Stage)
 # MUDANÇA FINAL: Usando a imagem 'instrumentisto' que TEM a tag de versão
-FROM leoafarias/flutter:stable AS build
+FROM cirrusci/flutter:stable AS build
 
 # Define o diretório de trabalho
 WORKDIR /app
