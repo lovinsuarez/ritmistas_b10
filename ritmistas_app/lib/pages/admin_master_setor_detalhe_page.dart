@@ -22,10 +22,25 @@ class _AdminMasterSetorDetalhePageState
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // --- NOVO: Variáveis de estado ---
+  final ApiService _apiService = ApiService();
+  String? _token;
+  bool _leaderChanged =
+      false; // Controla se a página anterior precisa recarregar
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadToken();
+  }
+
+  // NOVO: Função para carregar o token
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _token = prefs.getString('access_token');
+    });
   }
 
   @override
@@ -34,28 +49,140 @@ class _AdminMasterSetorDetalhePageState
     super.dispose();
   }
 
+  // --- NOVO: Lógica para designar o líder ---
+  Future<void> _showAssignLeaderDialog() async {
+    if (_token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Erro: Não autenticado.'),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 1. Busca todos os líderes disponíveis
+    List<UserAdminView> allLiders = [];
+    try {
+      allLiders = await _apiService.getAllLiders(_token!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erro ao buscar líderes: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    // 2. Mostra o diálogo
+    final selectedLider = await showDialog<UserAdminView>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Designar Líder'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: allLiders.length,
+              itemBuilder: (context, index) {
+                final lider = allLiders[index];
+                return ListTile(
+                  leading: const Icon(Icons.admin_panel_settings),
+                  title: Text(lider.username),
+                  subtitle: Text(lider.email),
+                  onTap: () {
+                    // Retorna o líder selecionado
+                    Navigator.of(ctx).pop(lider);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // 3. Se um líder foi selecionado, chama a API
+    if (selectedLider != null) {
+      try {
+        await _apiService.assignLiderToSector(
+          _token!,
+          widget.sector.sectorId,
+          selectedLider.userId,
+        );
+
+        setState(() {
+          _leaderChanged = true; // Marca que uma mudança foi feita
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  '${selectedLider.username} agora é o líder de ${widget.sector.name}!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Erro ao designar líder: $e'),
+                backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        // Mostra o nome do setor no título
-        title: Text(widget.sector.name),
-        bottom: TabBar(
+    // NOVO: Adiciona o WillPopScope para 'avisar' a página anterior
+    // quando ela precisar recarregar.
+    return WillPopScope(
+      onWillPop: () async {
+        // Ao clicar em 'Voltar', retorna 'true' se o líder mudou
+        Navigator.of(context).pop(_leaderChanged);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          // Mostra o nome do setor no título
+          title: Text(widget.sector.name),
+          // NOVO: Botão de Ação
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person_add_alt_1),
+              tooltip: 'Designar Líder',
+              onPressed: _showAssignLeaderDialog,
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Usuários'),
+              Tab(text: 'Ranking'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Usuários'),
-            Tab(text: 'Ranking'),
+          children: [
+            // Aba 1: Lista de Usuários
+            _UsuariosDoSetorView(sectorId: widget.sector.sectorId),
+            // Aba 2: Ranking do Setor
+            _RankingDoSetorView(sectorId: widget.sector.sectorId),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Aba 1: Lista de Usuários
-          _UsuariosDoSetorView(sectorId: widget.sector.sectorId),
-          // Aba 2: Ranking do Setor
-          _RankingDoSetorView(sectorId: widget.sector.sectorId),
-        ],
       ),
     );
   }
@@ -107,7 +234,9 @@ class _UsuariosDoSetorViewState extends State<_UsuariosDoSetorView>
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Erro: ${snapshot.error}'));
+          return Center(
+              child: Text(
+                  'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text('Nenhum usuário neste setor.'));
@@ -122,7 +251,12 @@ class _UsuariosDoSetorViewState extends State<_UsuariosDoSetorView>
               final bool isLider = user.role == '1';
               return ListTile(
                 leading: Icon(isLider ? Icons.security : Icons.person),
-                title: Text(user.username),
+                title: Text(
+                  user.username,
+                  style: TextStyle(
+                    fontWeight: isLider ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
                 subtitle: Text(user.email),
               );
             },
@@ -182,7 +316,9 @@ class _RankingDoSetorViewState extends State<_RankingDoSetorView>
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Erro: ${snapshot.error}'));
+          return Center(
+              child: Text(
+                  'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
         }
         if (!snapshot.hasData) {
           return const Center(child: Text('Nenhum dado de ranking.'));

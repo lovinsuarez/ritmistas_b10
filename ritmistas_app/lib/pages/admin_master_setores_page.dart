@@ -181,8 +181,11 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                           },
                         ),
                         // ADICIONADO: Ação de clique no item
-                        onTap: () {
-                          Navigator.of(context).push(
+                        onTap: () async {
+                          // <-- Torna a função 'async'
+                          // 'await' espera a página de detalhes ser fechada
+                          final bool? mudancaFeita =
+                              await Navigator.of(context).push<bool>(
                             MaterialPageRoute(
                               builder: (context) => AdminMasterSetorDetalhePage(
                                 sector:
@@ -190,6 +193,11 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
                               ),
                             ),
                           );
+
+                          // Se a página de detalhes retornou 'true', recarrega a lista
+                          if (mudancaFeita == true) {
+                            _refreshSectors();
+                          }
                         },
                       ),
                     );
