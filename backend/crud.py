@@ -229,6 +229,8 @@ def create_sector(db: Session, sector_name: str):
     return db_sector
 
 def get_all_sectors(db: Session):
+    """Retorna todos os setores."""
+    # Simplificamos para evitar erros de transação durante a leitura
     return db.query(models.Sector).all()
 
 def get_liders(db: Session):
@@ -238,9 +240,13 @@ def get_all_users(db: Session):
     return db.query(models.User).filter(models.User.role == models.UserRole.user).all()
 
 def update_user_role(db: Session, user_to_update: models.User, new_role: models.UserRole):
+    """Atualiza o 'role' de um usuário."""
     user_to_update.role = new_role
+    
+    # Se virou Lider ou Admin, ativa automaticamente
     if new_role in [models.UserRole.lider, models.UserRole.admin]:
         user_to_update.status = models.UserStatus.ACTIVE
+        
     db.commit()
     db.refresh(user_to_update)
     return user_to_update

@@ -57,9 +57,23 @@ usuario 2
 lider 1
 admin master 0
 
-parei na atualização do backend onde sera implementado a aprovação do lider para o seu setor 08-11-2025
-<https://gemini.google.com/share/d5386ebc9065>
-![alt text]({D7DC1190-8649-425E-AF8E-A22B15D4ECB2}.png)
+
+________________________________________________
+MASTER
+master@teste.com
+senha: 123456
 
 
-login adminmaster@teste.com
+LIDER
+liderrit@teste.com
+senha: 123456
+liderlog@teste.com
+senha: 123456
+
+USER
+userrit@teste.com
+senha: 123456
+userrit2@teste.com
+senha: 123456
+
+

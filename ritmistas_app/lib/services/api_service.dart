@@ -435,7 +435,7 @@ class ApiService {
         "Authorization": "Bearer $token",
       },
       body: jsonEncode({
-        "sector_name": sectorName,
+        "name": sectorName,
       }), // Envia como {"sector_name": "Nome"}
     );
     final data = jsonDecode(response.body);
