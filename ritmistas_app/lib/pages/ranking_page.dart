@@ -144,7 +144,7 @@ class _RankingListViewState extends State<RankingListView>
         // --- 3. Estado de Sucesso ---
         if (snapshot.hasData) {
           final data = snapshot.data!;
-          final int myUserId = data['my_user_id'];
+          final int myUserId = data['my_user_id'] ?? 0;
           final List<RankingEntry> ranking = (data['ranking'] as List)
               .map((item) => RankingEntry.fromJson(item))
               .toList();

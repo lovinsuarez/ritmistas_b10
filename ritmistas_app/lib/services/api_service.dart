@@ -214,6 +214,24 @@ class ApiService {
     }
   }
 
+  Future<void> joinSector(String token, String inviteCode) async {
+    final url = Uri.parse('$_baseUrl/user/join-sector');
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      },
+      // O backend espera um JSON com "invite_code"
+      body: jsonEncode({"invite_code": inviteCode}),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['detail'] ?? 'Falha ao entrar no setor');
+    }
+  }
+
   // --- Funções de Ranking (Todos os papéis) ---
 
   // ALTERADO: Renomeado de getRanking para getSectorRanking
