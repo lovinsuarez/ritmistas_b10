@@ -119,3 +119,12 @@ class UserDashboard(BaseModel):
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
     model_config = ConfigDict(from_attributes=True)
+
+class AuditLogItem(BaseModel):
+    timestamp: datetime
+    type: str # "CHECK-IN", "CÓDIGO GERAL", "CÓDIGO ÚNICO"
+    user_name: str
+    lider_name: str
+    sector_name: str
+    description: str
+    points: int

@@ -1,8 +1,8 @@
 // lib/pages/home_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart'; // Pacote da barra curva
+import 'package:ritmistas_app/main.dart'; // Cores e Tema
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
@@ -15,6 +15,8 @@ import 'package:ritmistas_app/main.dart' show LoginPage;
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
+// IMPORTANTE: Nova página de relatórios
+import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart'; 
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -81,27 +83,23 @@ class _HomePageState extends State<HomePage> {
 // --- WIDGET AUXILIAR PARA O TÍTULO COM LOGO ---
 Widget _buildAppBarTitle(String title) {
   return Row(
-    mainAxisSize: MainAxisSize.min, // Ocupa o mínimo espaço possível
+    mainAxisSize: MainAxisSize.min,
     children: [
       ClipOval(
         child: Image.asset(
-          'assets/images/logob10.png', // Confirme se é .jpg ou .png!
-          height: 30, // Reduzi de 35 para 30 para caber melhor
+          'assets/images/logoB10.png', // Certifique-se que é .png ou .jpg conforme seu projeto
+          height: 30,
           width: 30,
           fit: BoxFit.cover,
-              // Fallback: loga o erro para debug e mostra um ícone substituto
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Failed to load appbar logo: $error');
-                return const Icon(Icons.music_note, color: Colors.yellow);
-              },
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.music_note, color: Colors.yellow),
         ),
       ),
-      const SizedBox(width: 8), // Reduzi o espaçamento
-      Flexible( // Garante que o texto quebre linha se precisar
+      const SizedBox(width: 8),
+      Flexible(
         child: Text(
           title,
-          style: const TextStyle(fontSize: 18), // Ajustei o tamanho da fonte
-          overflow: TextOverflow.ellipsis, // Coloca "..." se for muito longo
+          style: const TextStyle(fontSize: 18),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     ],
@@ -118,7 +116,7 @@ class UserScaffold extends StatefulWidget {
 }
 
 class _UserScaffoldState extends State<UserScaffold> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Começa no Perfil
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
@@ -131,7 +129,7 @@ class _UserScaffoldState extends State<UserScaffold> {
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: _buildAppBarTitle('Ritmistas B10'), // Usa o widget com logo
+        title: _buildAppBarTitle('Ritmistas B10'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -143,9 +141,9 @@ class _UserScaffoldState extends State<UserScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.qr_code_scanner, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black),
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon(Icons.qr_code_scanner, size: 30, color: Colors.black), // Resgate
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
@@ -172,7 +170,7 @@ class LiderScaffold extends StatefulWidget {
 }
 
 class _LiderScaffoldState extends State<LiderScaffold> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Começa no Perfil
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
@@ -188,7 +186,7 @@ class _LiderScaffoldState extends State<LiderScaffold> {
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: _buildAppBarTitle('LÍDER - B10'), // Usa o widget com logo
+        title: _buildAppBarTitle('LÍDER - B10'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -200,12 +198,12 @@ class _LiderScaffoldState extends State<LiderScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.add_circle, size: 30, color: Colors.black),
-          Icon(Icons.list_alt, size: 30, color: Colors.black),
-          Icon(Icons.notification_important, size: 30, color: Colors.black),
-          Icon(Icons.group, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black),
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon(Icons.add_circle, size: 30, color: Colors.black), // Cadastro
+          Icon(Icons.list_alt, size: 30, color: Colors.black), // Atividades
+          Icon(Icons.notification_important, size: 30, color: Colors.black), // Aprovar
+          Icon(Icons.group, size: 30, color: Colors.black), // Usuários
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
@@ -232,12 +230,14 @@ class AdminMasterScaffold extends StatefulWidget {
 }
 
 class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Começa no Perfil
 
+  // LISTA ATUALIZADA COM A NOVA PÁGINA DE RELATÓRIOS
   static final List<Widget> _widgetOptions = <Widget>[
     const PerfilPage(),
     const AdminMasterSetoresPage(),
     const AdminMasterLideresPage(),
+    const AdminMasterRelatoriosPage(), // <--- NOVA ABA AQUI
   ];
 
   @override
@@ -245,7 +245,7 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        title: _buildAppBarTitle('MASTER - B10'), // Usa o widget com logo
+        title: _buildAppBarTitle('MASTER - B10'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -257,9 +257,10 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.apartment, size: 30, color: Colors.black),
-          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black),
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
+          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
+          Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios/Auditoria (NOVO)
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

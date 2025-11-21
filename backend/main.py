@@ -173,6 +173,14 @@ def promote(user_id: int, db: Session = Depends(get_db), admin: models.User = De
 def assign(sector_id: int, lider_id: int = Body(..., embed=True), db: Session = Depends(get_db), admin: models.User = Depends(security.get_current_admin_master)):
     return crud.assign_lider_to_sector(db, lider_id, sector_id)
 
+@app.get("/admin-master/audit/json", response_model=List[schemas.AuditLogItem])
+def get_audit_logs_endpoint(
+    db: Session = Depends(get_db), 
+    admin: models.User = Depends(security.get_current_admin_master)
+):
+    """Retorna as últimas 100 transações para auditoria visual."""
+    return crud.get_audit_logs_json(db, limit=100)
+
 # NOVO: Endpoint para baixar Relatório de Auditoria
 @app.get("/admin-master/reports/audit")
 def download_audit_report(db: Session = Depends(get_db), admin: models.User = Depends(security.get_current_admin_master)):

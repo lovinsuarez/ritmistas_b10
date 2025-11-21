@@ -478,6 +478,29 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> getAuditLogs(String token) async {
+    final url = Uri.parse('$_baseUrl/admin-master/audit/json');
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode == 200) {
+      // Retorna a lista crua, vamos tratar na tela
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Falha ao carregar auditoria');
+    }
+  }
+  
+  // NOVO: Função para gerar URL de download do CSV (para abrir no navegador)
+  String getAuditCsvUrl(String token) {
+    // O download de arquivos no Flutter mobile geralmente é feito abrindo o navegador
+    // Mas como o endpoint precisa de Header Authorization, 
+    // o ideal seria baixar o arquivo internamente. 
+    // Para simplificar, vamos focar na visualização em tela primeiro.
+    return '$_baseUrl/admin-master/reports/audit';
+  }
+
   // NOVO: Listar Setores
   Future<List<Sector>> getAllSectors(String token) async {
     final url = Uri.parse('$_baseUrl/admin-master/sectors');

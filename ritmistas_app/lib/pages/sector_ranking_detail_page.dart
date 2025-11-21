@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/pages/ranking_page.dart'; // Para usar o RankingEntry e o card estilizado
+import 'package:ritmistas_app/pages/ranking_page.dart'; // Para usar RankingEntry
 
 class SectorRankingDetailPage extends StatefulWidget {
   final int sectorId;
@@ -34,20 +34,9 @@ class _SectorRankingDetailPageState extends State<SectorRankingDetailPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) throw Exception("Não autenticado.");
-    // Chama o endpoint que já existe (agora precisamos garantir que ele aceite sector_id ou criar um novo)
-    // Nota: O endpoint '/ranking/sector' original pegava o primeiro setor.
-    // O AdminMaster já tem um endpoint '/admin-master/sectors/{id}/ranking'.
-    // Vamos precisar de um endpoint público para o usuário ver o ranking de um setor específico.
-    // Por enquanto, vamos assumir que você vai criar esse endpoint ou usar um existente.
     
-    // ATENÇÃO: Como o endpoint '/ranking/sector' atual é limitado, 
-    // vou sugerir usarmos o endpoint do Admin Master adaptado ou criar um novo.
-    // Para não mexer no backend agora, vou usar uma lógica simulada ou 
-    // precisaremos adicionar 'getSectorRankingById' no api_service.
-    
-    return _apiService.getRankingForSector(token, widget.sectorId); 
-    // (Essa função 'getRankingForSector' já existe no api_service para o Admin,
-    // mas se o backend bloquear usuário comum, teremos que ajustar. Vamos testar.)
+    // CORREÇÃO: Usando a função nova que busca por ID (a mesma das abas)
+    return _apiService.getSpecificSectorRanking(token, widget.sectorId);
   }
 
   @override
@@ -62,12 +51,24 @@ class _SectorRankingDetailPageState extends State<SectorRankingDetailPage> {
         future: _rankingFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow));
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
+            // Tratamento melhor de erro para mostrar na tela
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            );
           }
           
+          if (!snapshot.hasData) return const Center(child: Text('Sem dados.', style: TextStyle(color: Colors.grey)));
+
           final data = snapshot.data!;
           final int myUserId = data['my_user_id'] ?? 0;
           final List<RankingEntry> ranking = (data['ranking'] as List)
@@ -75,55 +76,74 @@ class _SectorRankingDetailPageState extends State<SectorRankingDetailPage> {
               .toList();
 
           if (ranking.isEmpty) {
-            return const Center(child: Text('Nenhum dado de ranking neste setor.'));
+            return const Center(child: Text('Nenhum dado de ranking neste setor.', style: TextStyle(color: Colors.grey)));
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(16.0),
             itemCount: ranking.length,
             itemBuilder: (context, index) {
               final entry = ranking[index];
               final position = index + 1;
               final bool isMe = (entry.userId == myUserId);
 
+              // Cores para o Top 3
+              Color posColor = Colors.white;
+              if (position == 1) posColor = const Color(0xFFFFD700);
+              if (position == 2) posColor = const Color(0xFFC0C0C0);
+              if (position == 3) posColor = const Color(0xFFCD7F32);
+
               return Card(
                 color: AppColors.cardBackground,
-                elevation: isMe ? 6.0 : 2.0,
-                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                elevation: isMe ? 4.0 : 1.0,
+                margin: const EdgeInsets.only(bottom: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
                   side: isMe
-                      ? const BorderSide(color: AppColors.primaryYellow, width: 2)
+                      ? const BorderSide(color: AppColors.primaryYellow, width: 1.5)
                       : BorderSide.none,
                 ),
-                child: ListTile(
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 30,
-                        child: Text(
-                          '$positionº',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  child: ListTile(
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 30,
+                          child: Text(
+                            '$positionº',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: posColor,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      CircleAvatar(
-                        backgroundColor: Colors.grey[800],
-                        child: const Icon(Icons.person, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  title: Text(
-                    entry.username,
-                    style: TextStyle(
-                      fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                      color: Colors.white,
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          backgroundColor: Colors.grey[800],
+                          child: const Icon(Icons.person, color: Colors.white54),
+                        ),
+                      ],
                     ),
-                  ),
-                  trailing: Text(
-                    '${entry.totalPoints} pts',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryYellow),
+                    title: Text(
+                      entry.username,
+                      style: TextStyle(
+                        fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                    trailing: Text(
+                      '${entry.totalPoints} pts',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryYellow,
+                      ),
+                    ),
                   ),
                 ),
               );

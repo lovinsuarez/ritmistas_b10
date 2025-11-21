@@ -327,3 +327,57 @@ def get_user_dashboard_details(db: Session, user_id: int, sector_id: int):
 def get_user_by_id(db: Session, user_id: int):
     """Busca um usuário pelo seu ID."""
     return db.query(models.User).filter(models.User.user_id == user_id).first()
+
+def get_audit_logs_json(db: Session, limit: int = 100):
+    """Retorna as últimas movimentações em formato de lista para o App."""
+    logs = []
+
+    # 1. Check-ins
+    checkins = db.query(models.CheckIn, models.Activity, models.User, models.Sector)\
+        .join(models.Activity, models.CheckIn.activity_id == models.Activity.activity_id)\
+        .join(models.User, models.CheckIn.user_id == models.User.user_id)\
+        .join(models.Sector, models.Activity.sector_id == models.Sector.sector_id)\
+        .order_by(models.CheckIn.timestamp.desc())\
+        .limit(limit)\
+        .all()
+        
+    for ci, act, usr, sec in checkins:
+        creator = db.query(models.User).filter(models.User.user_id == act.created_by).first()
+        lider_name = creator.username if creator else "Desconhecido"
+        
+        logs.append({
+            "timestamp": ci.timestamp,
+            "type": "CHECK-IN",
+            "user_name": usr.username,
+            "lider_name": lider_name,
+            "sector_name": sec.name,
+            "description": f"Evento: {act.title}",
+            "points": act.points_value
+        })
+
+    # 2. Códigos Gerais
+    general = db.query(models.GeneralCodeRedemption, models.RedeemCode, models.User, models.Sector)\
+        .join(models.RedeemCode, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
+        .join(models.User, models.GeneralCodeRedemption.user_id == models.User.user_id)\
+        .join(models.Sector, models.RedeemCode.sector_id == models.Sector.sector_id)\
+        .order_by(models.GeneralCodeRedemption.timestamp.desc())\
+        .limit(limit)\
+        .all()
+
+    for red, code, usr, sec in general:
+        creator = db.query(models.User).filter(models.User.user_id == code.created_by).first()
+        lider_name = creator.username if creator else "Desconhecido"
+        
+        logs.append({
+            "timestamp": red.timestamp,
+            "type": "CÓDIGO GERAL",
+            "user_name": usr.username,
+            "lider_name": lider_name,
+            "sector_name": sec.name,
+            "description": f"Código: {code.code_string}",
+            "points": code.points_value
+        })
+    
+    # Ordena tudo por data (do mais recente para o mais antigo)
+    logs.sort(key=lambda x: x['timestamp'], reverse=True)
+    return logs[:limit] # Retorna apenas o limite solicitado
