@@ -3,7 +3,7 @@ import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime
 import uuid
-from models import UserRole # Importa o Enum do models
+from models import UserRole, UserStatus # ALTERADO: Importa também o UserStatus
 
 # --- Schemas para TOKEN (Autenticação) ---
 class Token(BaseModel):
@@ -14,18 +14,9 @@ class TokenData(BaseModel):
     email: str | None = None
 
 # --- Schemas base para USUÁRIO ---
-
-# ALTERADO: Removida a classe 'NivelAcesso'
-# class NivelAcesso(BaseModel):
-#     nivel_acesso: int
-#     descricao: str
-
 class UserBase(BaseModel):
     email: EmailStr
     username: str
-    # ALTERADO: Removido o campo 'nivel_acesso'
-    # nivel_acesso: NivelAcesso 
-
 
 # Schema para Criar um Usuário (recebe senha)
 class UserCreate(UserBase):
@@ -38,20 +29,17 @@ class AdminCreate(UserCreate):
 # Schema para exibir um Usuário (nunca mostrar a senha)
 class User(UserBase):
     user_id: int
-    role: UserRole # Este é o campo correto que vem do banco
-    
-    # ALTERADO: sector_id agora pode ser nulo
+    role: UserRole 
     sector_id: int | None 
+    status: models.UserStatus # NOVO: Adiciona o status
 
-    model_config = ConfigDict(from_attributes=True) # Ajuda o Pydantic a ler dados do SQLAlchemy
+    model_config = ConfigDict(from_attributes=True) 
 
 # --- Schemas para SETOR ---
 class Sector(BaseModel):
     sector_id: int
     name: str
     invite_code: uuid.UUID
-    
-    # NOVO: Adiciona o ID do líder ao schema da API
     lider_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
@@ -85,8 +73,8 @@ class RankingResponse(BaseModel):
     ranking: list[RankingEntry]
 
 # --- Schemas para Registro de Usuário (via convite) ---
-class UserRegister(UserCreate): # Reutiliza os campos de email, username, password
-    invite_code: str # O código de convite do setor
+class UserRegister(UserCreate): 
+    invite_code: str 
 
 class SectorInfo(BaseModel):
     name: str
@@ -98,13 +86,13 @@ class SectorInfo(BaseModel):
 class ActivityCreate(BaseModel):
     title: str = Field(..., max_length=150)
     description: str | None = None
-    type: models.ActivityType # 'online' ou 'presencial'
-    address: str | None = None # Obrigatório se for 'presencial'
-    activity_date: datetime # Data e hora do evento
-    points_value: int = Field(..., gt=0) # Pontos (deve ser > 0)
+    type: models.ActivityType 
+    address: str | None = None 
+    activity_date: datetime 
+    points_value: int = Field(..., gt=0) 
 
 # Schema para exibir uma atividade (inclui o ID)
-class Activity(ActivityCreate): # Herda tudo do ActivityCreate
+class Activity(ActivityCreate): 
     activity_id: int
     created_by: int
     sector_id: int
@@ -112,9 +100,10 @@ class Activity(ActivityCreate): # Herda tudo do ActivityCreate
     model_config = ConfigDict(from_attributes=True)
 
 # --- Schemas para Admin (Gerenciamento de Usuário) ---
-class UserAdminView(UserBase): # Reutiliza email e username
+class UserAdminView(UserBase): 
     user_id: int
     role: models.UserRole
+    status: models.UserStatus # NOVO: Adiciona o status
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -139,7 +128,8 @@ class UserDashboard(BaseModel):
     checkins: list[CheckInDetail]
     redeemed_codes: list[CodeDetail]
 
-class UserResponse(User): # Herda tudo do schema 'User'
-    invite_code: uuid.UUID | None = None # Adiciona o campo opcional
+class UserResponse(User): 
+    invite_code: uuid.UUID | None = None 
+    status: models.UserStatus # NOVO: Adiciona o status
 
     model_config = ConfigDict(from_attributes=True)

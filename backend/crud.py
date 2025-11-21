@@ -22,6 +22,7 @@ def create_admin_master(db: Session, admin_data: schemas.UserCreate):
         username=admin_data.username,
         hashed_password=hashed_password,
         role=models.UserRole.admin,
+        status=models.UserStatus.ACTIVE, # ALTERADO: Admin Master já nasce ativo
         sector_id=None # Admin Master não tem setor
     )
     
@@ -214,6 +215,7 @@ def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
         username=user_data.username,
         hashed_password=hashed_password,
         role=models.UserRole.user, # Papel de usuário normal
+        status=models.UserStatus.PENDING, # ALTERADO: Usuário nasce pendente
         sector_id=sector.sector_id
     )
 
@@ -257,9 +259,13 @@ def get_activities_by_sector(db: Session, sector_id: int):
              .order_by(models.Activity.activity_date.desc())\
              .all()
 
+# ALTERADO: Esta função agora só retorna usuários ATIVOS
 def get_users_by_sector(db: Session, sector_id: int):
-    """Busca todos os usuários de um setor."""
-    return db.query(models.User).filter(models.User.sector_id == sector_id).order_by(models.User.username).all()
+    """Busca todos os usuários ATIVOS de um setor."""
+    return db.query(models.User).filter(
+        models.User.sector_id == sector_id,
+        models.User.status == models.UserStatus.ACTIVE # NOVO FILTRO
+    ).order_by(models.User.username).all()
 
 def get_user_by_id(db: Session, user_id: int):
     """Busca um usuário pelo seu ID."""
@@ -437,15 +443,18 @@ def get_geral_ranking(db: Session):
 
     # 5. Junta tudo com a tabela de Usuários
     # ALTERADO: Removido o filtro de 'sector_id'
-    ranking_query = db.query(
-        models.User.user_id,
-        models.User.username,
-        total_points_col 
-    ).outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)\
-    .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)\
-    .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)\
-    .filter(models.User.sector_id == sector_id)\
-    .order_by(total_points_col.desc()) # <-- A linha vermelha
+    ranking_query = (
+        db.query(
+            models.User.user_id,
+            models.User.username,
+            total_points_col
+        )
+        .outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)
+        .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)
+        .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)
+        .filter(models.User.role != models.UserRole.admin)  # Opcional: não incluir Admins no ranking
+        .order_by(total_points_col.desc())
+    )
 
     return ranking_query.all()
 
@@ -453,3 +462,21 @@ def get_geral_ranking(db: Session):
 def get_all_users(db: Session):
     """Retorna todos os usuários com a função 'user'."""
     return db.query(models.User).filter(models.User.role == models.UserRole.user).all()
+
+# --- NOVAS FUNÇÕES CRUD PARA APROVAÇÃO ---
+
+# NOVO: Função para o Líder ver os usuários pendentes
+def get_pending_users_by_sector(db: Session, sector_id: int):
+    """Busca todos os usuários PENDENTES de um setor."""
+    return db.query(models.User).filter(
+        models.User.sector_id == sector_id,
+        models.User.status == models.UserStatus.PENDING
+    ).order_by(models.User.username).all()
+
+# NOVO: Função para aprovar/rejeitar um usuário
+def update_user_status(db: Session, user_to_update: models.User, new_status: models.UserStatus):
+    """Atualiza o 'status' de um usuário (ex: de PENDING para ACTIVE)."""
+    user_to_update.status = new_status
+    db.commit()
+    db.refresh(user_to_update)
+    return user_to_update

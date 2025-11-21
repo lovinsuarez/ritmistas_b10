@@ -4,13 +4,16 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from typing import List # NOVO: Importar 'List' para response_models
+from typing import List 
 
 # Importa tudo que criamos nos outros arquivos
 import crud, models, schemas, security
 from database import engine, get_db
 
 # --- Criação das Tabelas no Banco ---
+# IMPORTANTE: Você precisará recriar seu banco de dados
+# (apagar o .db local ou o banco no Render) para que
+# a nova coluna 'status' seja adicionada.
 models.Base.metadata.create_all(bind=engine)
 
 # --- Inicialização do App FastAPI ---
@@ -42,7 +45,6 @@ def read_root():
     return {"status": "API Ritmistas B10 está online!"}
 
 
-# ALTERADO: Agora usa 'UserCreate' e 'create_admin_master'
 @app.post("/auth/register/admin-master", response_model=schemas.User)
 def register_admin_master(admin_data: schemas.UserCreate, db: Session = Depends(get_db)):
     """
@@ -69,6 +71,7 @@ def register_admin_master(admin_data: schemas.UserCreate, db: Session = Depends(
 def register_user(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     """
     Endpoint para um usuário normal se registrar usando um link de convite.
+    O usuário será criado com status 'PENDING'.
     """
     db_user = crud.get_user_by_email(db, email=user_data.email)
     if db_user:
@@ -105,6 +108,13 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # NOVO: Verifica se a conta está ativa
+    if user.status == models.UserStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sua conta está pendente de aprovação pelo líder do setor."
+        )
+
     access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
@@ -123,22 +133,22 @@ def read_users_me(
 ):
     """
     Retorna os dados do usuário atualmente logado.
-    Se for Líder ou Admin, inclui o código de convite do setor.
     """
     invite_code = None
     
-    # ALTERADO: Líderes também podem ver o código de convite
     if current_user.role in [models.UserRole.admin, models.UserRole.lider]:
         if current_user.sector_id:
             sector = crud.get_sector_by_id(db=db, sector_id=current_user.sector_id)
             if sector:
                 invite_code = sector.invite_code
             
+    # ALTERADO: Adiciona 'status' ao retorno
     return schemas.UserResponse(
         user_id=current_user.user_id,
         username=current_user.username,
         email=current_user.email,
         role=current_user.role,
+        status=current_user.status, # <-- NOVO
         sector_id=current_user.sector_id,
         invite_code=invite_code
     )
@@ -170,7 +180,6 @@ def redeem_code_endpoint(
 ):
     """ [Usuário] Endpoint para um usuário resgatar um código. """
 
-    # NOVO: Verifica se é um usuário
     if current_user.role != models.UserRole.user:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas usuários podem resgatar códigos.")
 
@@ -206,7 +215,6 @@ def checkin_endpoint(
 ):
     """ [Usuário] Endpoint para um usuário fazer check-in. """
 
-    # NOVO: Verifica se é um usuário
     if current_user.role != models.UserRole.user:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas usuários podem fazer check-in.")
 
@@ -254,7 +262,6 @@ def get_sector_ranking_endpoint(
         "ranking": ranking_data
     }
 
-# NOVO: Endpoint para o Ranking Geral
 @app.get("/ranking/geral", response_model=schemas.RankingResponse)
 def get_geral_ranking_endpoint(
     db: Session = Depends(get_db),
@@ -272,12 +279,11 @@ def get_geral_ranking_endpoint(
 # ENDPOINTS DE LÍDER (Líder e Admin Master)
 # ============================================
 
-# ALTERADO: Rota, dependência e lógica de permissão
 @app.post("/lider/codes/general", status_code=status.HTTP_201_CREATED)
 def create_general_code_endpoint(
     code_data: schemas.CodeCreateGeneral,
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
     """ [Líder] Cria um código de resgate geral para o seu setor. """
     
@@ -287,12 +293,11 @@ def create_general_code_endpoint(
     return crud.create_general_code(db=db, code_data=code_data, creator=current_lider)
 
 
-# ALTERADO: Rota, dependência e lógica de permissão
 @app.post("/lider/codes/unique", status_code=status.HTTP_201_CREATED)
 def create_unique_code_endpoint(
     code_data: schemas.CodeCreateUnique,
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
     """ [Líder] Cria um código de resgate único para um usuário do seu setor. """
 
@@ -304,12 +309,11 @@ def create_unique_code_endpoint(
 
     return crud.create_unique_code(db=db, code_data=code_data, creator=current_lider)
 
-# ALTERADO: Rota e dependência
 @app.post("/lider/activities", status_code=status.HTTP_201_CREATED)
 def create_activity_endpoint(
     activity_data: schemas.ActivityCreate,
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
     """ [Líder] Cria uma nova atividade para o seu setor. """
 
@@ -325,11 +329,10 @@ def create_activity_endpoint(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro interno: {str(e)}")
 
-# ALTERADO: Rota e dependência
 @app.get("/lider/activities", response_model=List[schemas.Activity])
 def get_activities_endpoint(
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
     """ [Líder] Retorna todas as atividades do seu setor. """
     
@@ -339,27 +342,25 @@ def get_activities_endpoint(
     activities = crud.get_activities_by_sector(db=db, sector_id=current_lider.sector_id)
     return activities
 
-# ALTERADO: Rota e dependência
 @app.get("/lider/users", response_model=List[schemas.UserAdminView])
 def get_users_endpoint(
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
-    """ [Líder] Retorna todos os usuários do seu setor. """
+    """ [Líder] Retorna todos os usuários ATIVOS do seu setor. """
     
     if not current_lider.sector_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
 
     return crud.get_users_by_sector(db=db, sector_id=current_lider.sector_id)
 
-# ALTERADO: Rota e permissão
 @app.delete("/lider/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
-    """ [Líder] Deleta um usuário do seu setor. """
+    """ [Líder] Deleta um usuário ATIVO do seu setor. """
     
     if user_id == current_lider.user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Líder não pode deletar a si mesmo.")
@@ -369,47 +370,45 @@ def delete_user_endpoint(
     if not user_to_delete or user_to_delete.sector_id != current_lider.sector_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado neste setor.")
         
-    # NOVO: Líder só pode deletar usuários
     if user_to_delete.role != models.UserRole.user:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Líderes só podem deletar usuários.")
+        
+    # NOVO: Líder só pode deletar usuários ATIVOS (pendentes são em /reject-user)
+    if user_to_delete.status != models.UserStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este usuário não está ativo.")
+
 
     crud.delete_user(db=db, user_to_delete=user_to_delete)
     return {"ok": True} # Retorno 204 não tem corpo
 
-# ALTERADO: Rota e permissão
 @app.get("/lider/users/{user_id}/dashboard", response_model=schemas.UserDashboard)
 def get_user_dashboard_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_lider: models.User = Depends(security.get_current_lider) # <-- NOVO GUARDA
+    current_lider: models.User = Depends(security.get_current_lider) 
 ):
     """
     [Líder] Retorna a dashboard detalhada de um usuário específico do seu setor.
-    (Também permite que um usuário veja o seu próprio dashboard)
     """
     
-    # 1. Verifica se o usuário-alvo (user_id) existe
     target_user = crud.get_user_by_id(db, user_id=user_id)
     if not target_user:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário alvo não encontrado.")
 
-    # 2. Verifica se o requisitante (current_lider) tem permissão
     is_lider_or_admin = current_lider.role in [models.UserRole.lider, models.UserRole.admin]
-    is_self = current_lider.user_id == user_id
+    is_self = current_user.user_id == user_id
     
     if not is_lider_or_admin and not is_self:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
         
     if target_user.sector_id != current_lider.sector_id:
-        # Exceção para Admin Master, que pode não ter setor mas pode ver tudo
         if current_lider.role != models.UserRole.admin:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não pertence ao seu setor.")
 
-    # 3. Se passou, busca os dados
     dashboard_data = crud.get_user_dashboard_details(
         db=db, 
         user_id=user_id, 
-        sector_id=target_user.sector_id # Usa o sector_id do alvo
+        sector_id=target_user.sector_id 
     )
     
     if not dashboard_data:
@@ -417,11 +416,55 @@ def get_user_dashboard_endpoint(
         
     return dashboard_data
 
+# --- NOVOS ENDPOINTS DE APROVAÇÃO DO LÍDER ---
+
+@app.get("/lider/pending-users", response_model=List[schemas.UserAdminView])
+def get_pending_users_endpoint(
+    db: Session = Depends(get_db),
+    current_lider: models.User = Depends(security.get_current_lider)
+):
+    """ [Líder] Retorna todos os usuários pendentes de aprovação do seu setor. """
+    if not current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não está associado a um setor.")
+    return crud.get_pending_users_by_sector(db=db, sector_id=current_lider.sector_id)
+
+@app.put("/lider/approve-user/{user_id}", response_model=schemas.UserAdminView)
+def approve_user_endpoint(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_lider: models.User = Depends(security.get_current_lider)
+):
+    """ [Líder] Aprova a entrada de um usuário pendente. """
+    user_to_approve = crud.get_user_by_id(db, user_id=user_id)
+    
+    if not user_to_approve or user_to_approve.sector_id != current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário pendente não encontrado neste setor.")
+    if user_to_approve.status != models.UserStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este usuário não está pendente.")
+    
+    return crud.update_user_status(db=db, user_to_update=user_to_approve, new_status=models.UserStatus.ACTIVE)
+
+@app.delete("/lider/reject-user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def reject_user_endpoint(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_lider: models.User = Depends(security.get_current_lider)
+):
+    """ [Líder] Rejeita (deleta) um usuário pendente. """
+    user_to_reject = crud.get_user_by_id(db, user_id=user_id)
+    
+    if not user_to_reject or user_to_reject.sector_id != current_lider.sector_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário pendente não encontrado neste setor.")
+    if user_to_reject.status != models.UserStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este usuário não está pendente.")
+    
+    crud.delete_user(db=db, user_to_delete=user_to_reject)
+    return {"ok": True}
+
 # ============================================
 # ENDPOINTS DE ADMIN MASTER (Admin Master)
 # ============================================
 
-# NOVO: Endpoint para Admin Master criar setores
 @app.post("/admin-master/sectors", response_model=schemas.Sector)
 def create_sector_endpoint(
     sector_name: str = Body(..., embed=True),
@@ -431,7 +474,6 @@ def create_sector_endpoint(
     """ [Admin Master] Cria um novo setor (organização). """
     return crud.create_sector(db=db, sector_name=sector_name)
 
-# NOVO: Endpoint para Admin Master ver todos os setores
 @app.get("/admin-master/sectors", response_model=List[schemas.Sector])
 def get_all_sectors_endpoint(
     db: Session = Depends(get_db),
@@ -440,7 +482,6 @@ def get_all_sectors_endpoint(
     """ [Admin Master] Lista todos os setores criados. """
     return crud.get_all_sectors(db=db)
 
-# NOVO: Endpoint para Admin Master ver todos os líderes
 @app.get("/admin-master/liders", response_model=List[schemas.UserAdminView])
 def get_all_liders_endpoint(
     db: Session = Depends(get_db),
@@ -449,12 +490,11 @@ def get_all_liders_endpoint(
     """ [Admin Master] Lista todos os usuários que são Líderes. """
     return crud.get_liders(db=db)
 
-# ALTERADO: Rota e permissão
 @app.put("/admin-master/users/{user_id}/promote-to-lider", response_model=schemas.UserAdminView)
 def promote_user_to_lider_endpoint(
     user_id: int,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_admin_master) # <-- NOVO GUARDA
+    current_admin: models.User = Depends(security.get_current_admin_master) 
 ):
     """ [Admin Master] Promove um usuário (user) para Líder (lider). """
     
@@ -468,12 +508,11 @@ def promote_user_to_lider_endpoint(
 
     return crud.update_user_role(db=db, user_to_update=user_to_promote, new_role=models.UserRole.lider)
 
-# ALTERADO: Rota e permissão
 @app.put("/admin-master/liders/{lider_id}/demote-to-user", response_model=schemas.UserAdminView)
 def demote_lider_to_user_endpoint(
     lider_id: int,
     db: Session = Depends(get_db),
-    current_admin: models.User = Depends(security.get_current_admin_master) # <-- NOVO GUARDA
+    current_admin: models.User = Depends(security.get_current_admin_master) 
 ):
     """ [Admin Master] Rebaixa um Líder (lider) para Usuário (user). """
     
@@ -490,7 +529,6 @@ def demote_lider_to_user_endpoint(
         
     return crud.update_user_role(db=db, user_to_update=user_to_demote, new_role=models.UserRole.user)
 
-# NOVO: Endpoint para Admin Master designar um líder
 @app.put("/admin-master/sectors/{sector_id}/assign-lider", response_model=schemas.Sector)
 def assign_lider_endpoint(
     sector_id: int,
@@ -507,8 +545,6 @@ def assign_lider_endpoint(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
     
-
-# NOVO: Endpoint para Admin Master ver todos os usuários (para promover)
 @app.get("/admin-master/users", response_model=List[schemas.UserAdminView])
 def get_all_users_endpoint(
     db: Session = Depends(get_db),
@@ -517,9 +553,6 @@ def get_all_users_endpoint(
     """ [Admin Master] Lista todos os usuários comuns (role 'user'). """
     return crud.get_all_users(db=db)
 
-# --- INÍCIO DAS NOVAS ROTAS PARA ADMIN MASTER VER DETALHES DO SETOR ---
-
-# NOVO: Endpoint para Admin Master ver os usuários de UM setor
 @app.get("/admin-master/sectors/{sector_id}/users", response_model=List[schemas.UserAdminView])
 def get_sector_users_admin_endpoint(
     sector_id: int,
@@ -527,14 +560,12 @@ def get_sector_users_admin_endpoint(
     current_admin: models.User = Depends(security.get_current_admin_master)
 ):
     """ [Admin Master] Lista todos os usuários de um setor específico. """
-    # Reutiliza a função do CRUD. Verifica se o setor existe primeiro.
     sector = crud.get_sector_by_id(db, sector_id=sector_id)
     if not sector:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
     
     return crud.get_users_by_sector(db=db, sector_id=sector_id)
 
-# NOVO: Endpoint para Admin Master ver o ranking de UM setor
 @app.get("/admin-master/sectors/{sector_id}/ranking", response_model=schemas.RankingResponse)
 def get_sector_ranking_admin_endpoint(
     sector_id: int,
@@ -542,13 +573,12 @@ def get_sector_ranking_admin_endpoint(
     current_admin: models.User = Depends(security.get_current_admin_master)
 ):
     """ [Admin Master] Retorna o ranking de um setor específico. """
-    # Reutiliza a função do CRUD. Verifica se o setor existe primeiro.
     sector = crud.get_sector_by_id(db, sector_id=sector_id)
     if not sector:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado.")
 
     ranking_data = crud.get_sector_ranking(db=db, sector_id=sector_id)
     return {
-        "my_user_id": current_admin.user_id, # O Admin Master pode se ver no ranking se participar
+        "my_user_id": current_admin.user_id, 
         "ranking": ranking_data
     }

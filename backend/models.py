@@ -17,6 +17,11 @@ class UserRole(enum.Enum):
     lider = "1"   # Líder de Setor
     user = "2"    # Usuário Padrão
 
+# NOVO: Enum para o status de aprovação do usuário
+class UserStatus(enum.Enum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+
 class ActivityType(enum.Enum):
     online = "online"
     presencial = "presencial"
@@ -54,6 +59,9 @@ class User(Base):
     username = Column(String(50), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
+    
+    # NOVO: Coluna de status de aprovação
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
     
     sector_id = Column(
         Integer, 
