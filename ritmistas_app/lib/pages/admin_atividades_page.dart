@@ -1,11 +1,11 @@
 // lib/pages/admin_atividades_page.dart
 
-import 'dart:convert'; // Para o jsonEncode do QRCode
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Para formatar datas
-import 'package:qr_flutter/qr_flutter.dart'; // Para gerar QR Code
+import 'package:ritmistas_app/main.dart'; // Importa AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // Certifique-se de ter esse pacote
 
 class AdminAtividadesPage extends StatefulWidget {
   const AdminAtividadesPage({super.key});
@@ -17,6 +17,7 @@ class AdminAtividadesPage extends StatefulWidget {
 class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
   final ApiService _apiService = ApiService();
   late Future<List<Activity>> _activitiesFuture;
+  String? _token;
 
   @override
   void initState() {
@@ -26,185 +27,200 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
 
   Future<List<Activity>> _loadActivities() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) throw Exception("Admin não autenticado.");
-    return _apiService.getActivities(token);
+    _token = prefs.getString('access_token');
+    if (_token == null) throw Exception("Líder não autenticado.");
+    return _apiService.getActivities(_token!);
   }
 
-  Future<void> _refreshActivities() async {
+  Future<void> _refresh() async {
     setState(() {
       _activitiesFuture = _loadActivities();
     });
+    await _activitiesFuture;
   }
 
-  // Função que MOSTRA O QR CODE
-  void _showQrCode(BuildContext context, Activity activity) {
-    // O JSON que o app do usuário vai ler
-    final qrData = jsonEncode({
-      "type": "checkin",
-      "activity_id": activity.activityId,
-    });
-
+  // Função para mostrar o QR Code em um modal
+  void _showQRCode(Activity activity) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(activity.title),
-          content: SizedBox(
-            width: 300,
-            height: 300,
-            child: QrImageView(
-              // O Widget que renderiza o QR Code
-              data: qrData,
-              version: QrVersions.auto,
-              size: 280,
-            ),
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white, // QR Code precisa de contraste
+        title: Text(
+          activity.title,
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: SizedBox(
+          width: 300,
+          height: 300,
+          child: Column(
+            children: [
+              Expanded(
+                child: QrImageView(
+                  data: activity.activityId.toString(), // O dado é o ID da atividade
+                  version: QrVersions.auto,
+                  size: 250.0,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Peça para os membros escanearem",
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              child: const Text('Fechar'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("FECHAR", style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Formato da data (Ex: 21/11/2025 - 09:09)
+    final dateFormat = DateFormat('dd/MM/yyyy - HH:mm');
+
     return Scaffold(
-      // Adiciona um Scaffold
+      // Fundo transparente pois o Scaffold principal já tem cor
+      backgroundColor: Colors.transparent,
+      
       body: FutureBuilder<List<Activity>>(
         future: _activitiesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (snapshot.hasError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Erro: ${snapshot.error}'),
+                  Text(
+                    'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _refreshActivities,
+                    onPressed: _refresh,
                     child: const Text('Tentar Novamente'),
                   ),
                 ],
               ),
             );
           }
-
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: _refreshActivities,
-              child: const Center(child: Text('Nenhuma atividade cadastrada.')),
+            return const Center(
+              child: Text(
+                'Nenhuma atividade criada.',
+                style: TextStyle(color: Colors.grey),
+              ),
             );
           }
 
           final activities = snapshot.data!;
 
           return RefreshIndicator(
-            onRefresh: _refreshActivities,
+            onRefresh: _refresh,
             child: ListView.builder(
-              padding: const EdgeInsets.only(
-                top: 8.0,
-                bottom: 8.0,
-              ), // Adiciona espaço
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 80), // Padding em baixo p/ nav bar
               itemCount: activities.length,
               itemBuilder: (context, index) {
                 final activity = activities[index];
+                final isOnline = activity.type == 'online';
 
-                // Formata a data para "31/10/2025 - 19:30"
-                final formattedDate = DateFormat(
-                  'dd/MM/yyyy - HH:mm',
-                ).format(activity.activityDate.toLocal());
-
-                // --- NOVO DESIGN COM CARD ---
                 return Card(
-                  elevation: 2.0,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 6.0,
-                  ),
+                  color: AppColors.cardBackground, // Fundo Cinza Escuro
+                  elevation: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 12.0,
-                    ),
+                    padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Título
                         Text(
-                          activity.title,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          activity.title.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 8),
+                        
+                        // Tipo / Endereço
                         Row(
                           children: [
                             Icon(
-                              activity.type == 'presencial'
-                                  ? Icons.location_on
-                                  : Icons.laptop_chromebook,
-                              color: Colors.grey[700],
+                              isOnline ? Icons.laptop : Icons.location_on,
                               size: 16,
+                              color: Colors.grey,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              activity.type == 'presencial'
-                                  ? activity.address ?? 'Sem endereço'
-                                  : 'Online',
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                isOnline ? "Online" : (activity.address ?? "Sem endereço"),
+                                style: const TextStyle(color: Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
+
+                        // Data
                         Row(
                           children: [
-                            Icon(
-                              Icons.calendar_today,
-                              color: Colors.grey[700],
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
+                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                            const SizedBox(width: 6),
                             Text(
-                              formattedDate,
-                              style: Theme.of(context).textTheme.bodyMedium,
+                              dateFormat.format(activity.activityDate.toLocal()),
+                              style: const TextStyle(color: Colors.grey),
                             ),
                           ],
                         ),
-                        const Divider(height: 20),
+
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          child: Divider(color: Colors.white24),
+                        ),
+
+                        // Rodapé: Pontos e Botão
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Pontos
                             Text(
-                              '${activity.pointsValue} PONTOS',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary, // Amarelo
+                              "${activity.pointsValue} PONTOS",
+                              style: const TextStyle(
+                                color: AppColors.primaryYellow,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
+
+                            // Botão com espaçamento corrigido
                             ElevatedButton.icon(
-                              icon: const Icon(Icons.qr_code),
-                              label: const Text('Gerar QR'),
+                              onPressed: () => _showQRCode(activity),
+                              icon: const Icon(Icons.qr_code_2, size: 20),
+                              label: const Text("Gerar QR Code"),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary, // Amarelo
-                                foregroundColor: Colors.black, // Texto preto
+                                backgroundColor: AppColors.primaryYellow,
+                                foregroundColor: Colors.black,
+                                // AQUI ESTÁ A CORREÇÃO DO ESPAÇAMENTO:
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
-                              onPressed: () {
-                                _showQrCode(context, activity);
-                              },
                             ),
                           ],
                         ),

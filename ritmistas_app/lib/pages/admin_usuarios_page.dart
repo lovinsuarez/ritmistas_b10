@@ -1,7 +1,8 @@
 // lib/pages/admin_usuarios_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/pages/admin_criar_codigo_page.dart'; // Importa a tela de criar código
+import 'package:ritmistas_app/main.dart';
+import 'package:ritmistas_app/pages/admin_criar_codigo_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,7 +16,7 @@ class AdminUsuariosPage extends StatefulWidget {
 class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
   final ApiService _apiService = ApiService();
   late Future<List<UserAdminView>> _usersFuture;
-  String? _token; // Guarda o token para as ações
+  String? _token;
 
   @override
   void initState() {
@@ -27,8 +28,6 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('access_token');
     if (_token == null) throw Exception("Líder não autenticado.");
-
-    // ALTERADO: Chamando a nova função correta do ApiService
     return _apiService.getSectorUsers(_token!);
   }
 
@@ -36,6 +35,7 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
     setState(() {
       _usersFuture = _loadUsers();
     });
+    await _usersFuture;
   }
 
   void _showError(String message) {
@@ -48,24 +48,17 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
     );
   }
 
-  // --- Ações do Líder ---
-
-  // REMOVIDO: A função _handlePromote foi removida.
-  // Apenas o Admin Master pode promover.
-
-  // REMOVIDO: A função _handleDemote foi removida.
-  // Apenas o Admin Master pode rebaixar.
-
-  // Esta função está CORRETA. O Líder pode remover usuários.
   void _handleDelete(UserAdminView user) async {
     if (_token == null) return;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar Exclusão'),
+        backgroundColor: AppColors.cardBackground,
+        title: const Text('Confirmar Exclusão', style: TextStyle(color: Colors.white)),
         content: Text(
           'Tem certeza que deseja EXCLUIR ${user.username}? Todos os seus dados (check-ins, pontos) serão perdidos.',
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -83,7 +76,12 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
     if (confirm == true) {
       try {
         await _apiService.deleteUser(_token!, user.userId);
-        _refreshUsers(); // Atualiza a lista
+        _refreshUsers();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Usuário removido."), backgroundColor: Colors.green),
+          );
+        }
       } catch (e) {
         _showError(e.toString());
       }
@@ -93,6 +91,8 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Fundo transparente para ver o fundo do app principal
+      backgroundColor: Colors.transparent, 
       body: FutureBuilder<List<UserAdminView>>(
         future: _usersFuture,
         builder: (context, snapshot) {
@@ -106,7 +106,10 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
                 children: [
                   Text(
                     'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
                   ),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _refreshUsers,
                     child: const Text('Tentar Novamente'),
@@ -118,7 +121,12 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return RefreshIndicator(
               onRefresh: _refreshUsers,
-              child: const Center(child: Text('Nenhum usuário encontrado.')),
+              child: ListView(
+                children: const [
+                  SizedBox(height: 100),
+                  Center(child: Text('Nenhum usuário encontrado.', style: TextStyle(color: Colors.grey))),
+                ],
+              ),
             );
           }
 
@@ -127,51 +135,67 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
           return RefreshIndicator(
             onRefresh: _refreshUsers,
             child: ListView.builder(
+              // Adicionei padding embaixo para a lista não ficar escondida atrás da barra
+              padding: const EdgeInsets.fromLTRB(0, 10, 0, 80), 
               itemCount: users.length,
               itemBuilder: (context, index) {
                 final user = users[index];
-
-                // ALTERADO: A lógica agora checa 'Líder' (role "1")
-                // O antigo 'admin' agora é 'lider'
                 final bool isLider = user.role == '1';
                 final bool isUser = user.role == '2';
 
-                return ListTile(
-                  title: Text(
-                    user.username,
-                    style: TextStyle(
-                      fontWeight: isLider ? FontWeight.bold : FontWeight.normal,
+                return Card(
+                  color: AppColors.cardBackground,
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: isLider 
+                        ? const BorderSide(color: AppColors.primaryYellow, width: 1) 
+                        : BorderSide.none,
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: CircleAvatar(
+                      backgroundColor: isLider ? AppColors.primaryYellow : Colors.grey[800],
+                      child: Icon(
+                        isLider ? Icons.security : Icons.person,
+                        color: isLider ? Colors.black : Colors.white,
+                      ),
                     ),
+                    title: Text(
+                      user.username,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: isLider ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 16,
+                      ),
+                    ),
+                    subtitle: Text(
+                      user.email,
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    ),
+                    trailing: isUser ? PopupMenuButton(
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      color: AppColors.cardBackground,
+                      itemBuilder: (context) {
+                        return <PopupMenuEntry<String>>[
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.red, size: 20),
+                                SizedBox(width: 8),
+                                Text('Excluir Usuário', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ];
+                      },
+                      onSelected: (value) {
+                        if (value == 'delete') _handleDelete(user);
+                      },
+                    ) : null,
                   ),
-                  subtitle: Text(user.email),
-                  leading: Icon(
-                    // ALTERADO: Ícone para Líder
-                    isLider ? Icons.security : Icons.person,
-                  ),
-
-                  // ALTERADO: O menu de "3 pontinhos"
-                  // Só aparece para Usuários (role "2")
-                  trailing: isUser
-                      ? PopupMenuButton(
-                          itemBuilder: (context) {
-                            // A única opção para o Líder é 'Excluir'
-                            return <PopupMenuEntry<String>>[
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text(
-                                  'Excluir Usuário',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ];
-                          },
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              _handleDelete(user);
-                            }
-                          },
-                        )
-                      : null, // Não mostra menu para outros Líderes
                 );
               },
             ),
@@ -179,19 +203,23 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
         },
       ),
 
-      // Este botão está CORRETO. O Líder pode criar códigos.
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AdminCriarCodigoPage(),
-            ),
-          );
-        },
-        label: const Text('Criar Código'),
-        icon: const Icon(Icons.add),
-        backgroundColor: Theme.of(context).colorScheme.primary, // Amarelo
-        foregroundColor: Colors.black, // Texto preto
+      // --- AQUI ESTÁ A MUDANÇA DO BOTÃO ---
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80.0), // Levanta o botão 80px
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const AdminCriarCodigoPage(),
+              ),
+            );
+          },
+          label: const Text('Criar Código'),
+          icon: const Icon(Icons.qr_code_2),
+          backgroundColor: AppColors.primaryYellow,
+          foregroundColor: Colors.black,
+        ),
       ),
     );
   }

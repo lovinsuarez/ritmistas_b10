@@ -1,8 +1,7 @@
 // lib/pages/home_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:ritmistas_app/main.dart'; // Importa AppColors e Theme
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
@@ -11,10 +10,12 @@ import 'package:ritmistas_app/pages/perfil_page.dart';
 import 'package:ritmistas_app/pages/ranking_page.dart';
 import 'package:ritmistas_app/pages/resgate_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/main.dart' show LoginPage;
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
+
+// Importa a LoginPage para o logout
+import 'package:ritmistas_app/main.dart' show LoginPage; 
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -78,34 +79,39 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- WIDGET AUXILIAR PARA O TÍTULO COM LOGO ---
-Widget _buildAppBarTitle(String title) {
-  return Row(
-    mainAxisSize: MainAxisSize.min, // Ocupa o mínimo espaço possível
-    children: [
-      ClipOval(
-        child: Image.asset(
-          'assets/images/logob10.png', // Confirme se é .jpg ou .png!
-          height: 30, // Reduzi de 35 para 30 para caber melhor
-          width: 30,
-          fit: BoxFit.cover,
-              // Fallback: loga o erro para debug e mostra um ícone substituto
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Failed to load appbar logo: $error');
-                return const Icon(Icons.music_note, color: Colors.yellow);
-              },
-        ),
+// --- WIDGET AUXILIAR: BARRA DE NAVEGAÇÃO ESTILIZADA ---
+class CustomBottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onTap;
+  final List<BottomNavigationBarItem> items;
+
+  const CustomBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.white10, width: 1)), // Linha sutil no topo
       ),
-      const SizedBox(width: 8), // Reduzi o espaçamento
-      Flexible( // Garante que o texto quebre linha se precisar
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 18), // Ajustei o tamanho da fonte
-          overflow: TextOverflow.ellipsis, // Coloca "..." se for muito longo
-        ),
+      child: BottomNavigationBar(
+        backgroundColor: AppColors.background, // Fundo preto
+        selectedItemColor: AppColors.primaryYellow, // Ícone ativo amarelo
+        unselectedItemColor: Colors.grey, // Ícone inativo cinza
+        currentIndex: currentIndex,
+        onTap: onTap,
+        type: BottomNavigationBarType.fixed,
+        showSelectedLabels: true,
+        showUnselectedLabels: false, // Esconde texto dos não selecionados (clean)
+        elevation: 0,
+        items: items,
       ),
-    ],
-  );
+    );
+  }
 }
 
 // --- LAYOUT DO USUÁRIO ---
@@ -118,7 +124,7 @@ class UserScaffold extends StatefulWidget {
 }
 
 class _UserScaffoldState extends State<UserScaffold> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
@@ -128,35 +134,22 @@ class _UserScaffoldState extends State<UserScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
+    return Scaffold( // Usando Scaffold padrão para aplicar o tema escuro global
       appBar: AppBar(
-        title: _buildAppBarTitle('Ritmistas B10'), // Usa o widget com logo
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text('Ritmistas B10'),
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
       body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: CurvedNavigationBar(
-        index: _selectedIndex,
-        height: 60.0,
-        items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.qr_code_scanner, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
+          BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Resgate'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), activeIcon: Icon(Icons.emoji_events), label: 'Ranking'),
         ],
-        color: AppColors.primaryYellow,
-        buttonBackgroundColor: AppColors.primaryYellow,
-        backgroundColor: Colors.transparent,
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 300),
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
       ),
     );
   }
@@ -175,48 +168,35 @@ class _LiderScaffoldState extends State<LiderScaffold> {
   int _selectedIndex = 0;
 
   static const List<Widget> _widgetOptions = <Widget>[
-    PerfilPage(),
     AdminCadastroPage(),
     AdminAtividadesPage(),
     AdminAprovacoesPage(),
     AdminUsuariosPage(),
     AdminRankingPage(),
+    PerfilPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       appBar: AppBar(
-        title: _buildAppBarTitle('LÍDER - B10'), // Usa o widget com logo
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text('LÍDER - B10'),
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
       body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: CurvedNavigationBar(
-        index: _selectedIndex,
-        height: 60.0,
-        items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.add_circle, size: 30, color: Colors.black),
-          Icon(Icons.list_alt, size: 30, color: Colors.black),
-          Icon(Icons.notification_important, size: 30, color: Colors.black),
-          Icon(Icons.group, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), activeIcon: Icon(Icons.add_circle), label: 'Criar'),
+          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Atividades'),
+          BottomNavigationBarItem(icon: Icon(Icons.notification_important_outlined), activeIcon: Icon(Icons.notification_important), label: 'Aprovar'),
+          BottomNavigationBarItem(icon: Icon(Icons.group_outlined), activeIcon: Icon(Icons.group), label: 'Usuários'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), activeIcon: Icon(Icons.emoji_events), label: 'Ranking'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
-        color: AppColors.primaryYellow,
-        buttonBackgroundColor: AppColors.primaryYellow,
-        backgroundColor: Colors.transparent,
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 300),
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
       ),
     );
   }
@@ -235,42 +215,29 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
   int _selectedIndex = 0;
 
   static final List<Widget> _widgetOptions = <Widget>[
-    const PerfilPage(),
     const AdminMasterSetoresPage(),
     const AdminMasterLideresPage(),
+    const PerfilPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       appBar: AppBar(
-        title: _buildAppBarTitle('MASTER - B10'), // Usa o widget com logo
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text('MASTER - B10'),
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
       body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: CurvedNavigationBar(
-        index: _selectedIndex,
-        height: 60.0,
-        items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.apartment, size: 30, color: Colors.black),
-          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.apartment), label: 'Setores'),
+          BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_outlined), activeIcon: Icon(Icons.admin_panel_settings), label: 'Líderes'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
-        color: AppColors.primaryYellow,
-        buttonBackgroundColor: AppColors.primaryYellow,
-        backgroundColor: Colors.transparent,
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 300),
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
       ),
     );
   }

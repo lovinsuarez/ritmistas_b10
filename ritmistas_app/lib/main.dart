@@ -1,9 +1,68 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
-import 'package:ritmistas_app/theme.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// --- 1. DEFINIÇÃO DE CORES E TEMA ---
+
+class AppColors {
+  static const Color background = Color(0xFF121212); // Preto fundo
+  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
+  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
+  static const Color textWhite = Colors.white;
+  static const Color textGrey = Colors.grey;
+}
+
+final ThemeData appTheme = ThemeData(
+  brightness: Brightness.dark,
+  scaffoldBackgroundColor: AppColors.background,
+  primaryColor: AppColors.primaryYellow,
+  colorScheme: const ColorScheme.dark(
+    primary: AppColors.primaryYellow,
+    secondary: AppColors.primaryYellow,
+    surface: AppColors.cardBackground,
+    background: AppColors.background,
+  ),
+  fontFamily: 'Roboto', // Fonte padrão moderna
+  
+  // Estilo dos Botões Elevados (Amarelos)
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primaryYellow,
+      foregroundColor: Colors.black, // Texto preto no amarelo
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    ),
+  ),
+  
+  // Estilo dos Botões de Texto
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: AppColors.primaryYellow,
+      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+    ),
+  ),
+  
+  // Estilo dos Campos de Texto
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.cardBackground,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.primaryYellow, width: 1.5),
+    ),
+    hintStyle: const TextStyle(color: Colors.grey),
+    prefixIconColor: Colors.grey,
+    labelStyle: const TextStyle(color: Colors.grey),
+  ),
+);
 
 void main() {
   runApp(const MyApp());
@@ -23,9 +82,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- TELA DE LOGIN / REGISTRO ---
+// --- TELA DE LOGIN / REGISTRO (COM NOVO VISUAL) ---
 
-// ALTERADO: O modo 'registerAdmin' agora é 'registerAdminMaster'
 enum AuthMode { login, registerUser, registerAdminMaster }
 
 class LoginPage extends StatefulWidget {
@@ -36,44 +94,32 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  // Estado da tela
   AuthMode _authMode = AuthMode.login;
   bool _isLoading = false;
 
-  // Serviços e Controladores
   final ApiService _apiService = ApiService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
-  // ALTERADO: Removido o controller do nome do setor
-  // final _sectorNameController = TextEditingController();
   final _inviteCodeController = TextEditingController();
 
-  // --- FUNÇÕES DE LÓGICA ---
-
+  // --- LÓGICA DE LOGIN ---
   Future<void> _handleLogin() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
-      final email = _emailController.text;
-      final password = _passwordController.text;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-      // 1. Faz o login e pega o token
       final token = await _apiService.login(email, password);
-
-      // 2. Com o token, busca os dados do usuário (para saber o ROLE)
       final userData = await _apiService.getUsersMe(token);
-
-      // ALTERADO: O backend agora retorna '0' (admin), '1' (lider), '2' (user)
       final String userRole = userData['role'];
 
-      // 3. Salva o token E o role
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('access_token', token);
-      await prefs.setString('user_role', userRole); // <-- SALVA O ROLE
+      await prefs.setString('user_role', userRole);
 
-      // 4. Navega para a HomePage
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomePage()),
@@ -82,52 +128,35 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       _showError(e.toString());
     } finally {
-      if (mounted && _isLoading) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // --- LÓGICA DE REGISTRO ---
   Future<void> _handleRegister() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
-
     bool loginCalled = false;
 
     try {
-      final email = _emailController.text;
-      final password = _passwordController.text;
-      final username = _usernameController.text;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final username = _usernameController.text.trim();
 
       if (email.isEmpty || password.isEmpty || username.isEmpty) {
-        throw Exception("Email, Senha e Nome são obrigatórios.");
-      }
-      if (password.length < 8 || password.length > 72) {
-        throw Exception("A senha deve ter entre 8 e 72 caracteres.");
+        throw Exception("Preencha todos os campos.");
       }
 
-      // --- Lógica de Registro (Admin Master ou Usuário) ---
-      // ALTERADO: Lógica para o Admin Master
       if (_authMode == AuthMode.registerAdminMaster) {
-        // Removemos a verificação do nome do setor
-        // final sectorName = _sectorNameController.text;
-        // if (sectorName.isEmpty) {
-        //   throw Exception("Nome do Setor é obrigatório.");
-        // }
-
-        // Chama a nova função de 'registerAdminMaster'
         await _apiService.registerAdminMaster(
           email: email,
           password: password,
           username: username,
-          // sectorName: sectorName, <-- Não é mais necessário
         );
       } else {
-        // registerUser (Esta lógica permanece a mesma)
-        final inviteCode = _inviteCodeController.text;
-        if (inviteCode.isEmpty) {
-          throw Exception("Código de Convite é obrigatório.");
-        }
+        final inviteCode = _inviteCodeController.text.trim();
+        if (inviteCode.isEmpty) throw Exception("Código de convite obrigatório.");
+        
         await _apiService.registerUser(
           email: email,
           password: password,
@@ -136,39 +165,39 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
 
-      // Se o registro funcionou, tenta fazer o login
       if (mounted) {
-        _showSuccess('Registro bem-sucedido! Fazendo login...');
+        _showSuccess('Registro ok! Entrando...');
         loginCalled = true;
-        setState(() => _isLoading = false); // Libera o lock
-        await _handleLogin(); // Tenta logar
+        setState(() => _isLoading = false);
+        await _handleLogin();
       }
     } catch (e) {
       _showError(e.toString());
     } finally {
-      if (mounted && !loginCalled && _isLoading) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted && !loginCalled) setState(() => _isLoading = false);
     }
   }
 
   void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro: ${message.replaceAll("Exception: ", "")}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message.replaceAll("Exception: ", "")),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showSuccess(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.green),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _switchAuthMode(AuthMode newMode) {
@@ -177,192 +206,213 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // --- MÉTODO BUILD (A TELA) ---
+  // --- CONSTRUÇÃO DA TELA (VISUAL NOVO) ---
   @override
   Widget build(BuildContext context) {
     String title;
-    Widget primaryButton;
-    List<Widget> formFields;
-    Widget secondaryButton;
+    String subtitle;
+    String btnText;
+    List<Widget> fields;
+    Widget footer;
 
+    // Configuração dos textos e campos baseados no modo
     switch (_authMode) {
-      // --- MODO LOGIN ---
       case AuthMode.login:
-        title = 'Login';
-        formFields = [
-          _buildTextField(
-            _emailController,
-            'Email',
-            keyboardType: TextInputType.emailAddress,
-          ),
+        title = "BEM-VINDO";
+        subtitle = "Faça login para acessar sua conta.";
+        btnText = "ENTRAR";
+        fields = [
+          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField(_passwordController, 'Senha', obscureText: true),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
         ];
-        primaryButton = _buildPrimaryButton('Entrar', _handleLogin);
-        secondaryButton = Column(
+        footer = Column(
           children: [
-            _buildTextButton(
-              'Não tem uma conta? Registrar Usuário',
-              () => _switchAuthMode(AuthMode.registerUser),
+            TextButton(
+              onPressed: () => _switchAuthMode(AuthMode.registerUser),
+              child: const Text("Não tem conta? Cadastre-se"),
             ),
-            // ALTERADO: Texto do botão
-            _buildTextButton(
-              'Registrar como Admin Master',
-              () => _switchAuthMode(AuthMode.registerAdminMaster),
+            TextButton(
+              onPressed: () => _switchAuthMode(AuthMode.registerAdminMaster),
+              child: const Text("Sou Admin Master"),
             ),
           ],
         );
         break;
 
-      // --- MODO REGISTRO DE USUÁRIO ---
       case AuthMode.registerUser:
-        title = 'Registrar Usuário';
-        formFields = [
-          _buildTextField(
-            _emailController,
-            'Email',
-            keyboardType: TextInputType.emailAddress,
-          ),
+        title = "CRIAR CONTA";
+        subtitle = "Junte-se à bateria.";
+        btnText = "REGISTRAR";
+        fields = [
+          _buildTextField(_usernameController, 'Seu Nome', Icons.person_outline),
           const SizedBox(height: 16),
-          _buildTextField(_usernameController, 'Seu Nome'),
+          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField(_inviteCodeController, 'Código de Convite'),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
           const SizedBox(height: 16),
-          _buildTextField(
-            _passwordController,
-            'Senha',
-            obscureText: true,
-            helperText: 'Mín 8, máx 72 caracteres',
-          ),
+          _buildTextField(_inviteCodeController, 'Código de Convite', Icons.vpn_key_outlined),
         ];
-        primaryButton = _buildPrimaryButton(
-          'Registrar e Entrar',
-          _handleRegister,
-        );
-        secondaryButton = _buildTextButton(
-          'Já tem uma conta? Fazer Login',
-          () => _switchAuthMode(AuthMode.login),
+        footer = TextButton(
+          onPressed: () => _switchAuthMode(AuthMode.login),
+          child: const Text("Já tem conta? Faça Login"),
         );
         break;
 
-      // --- MODO REGISTRO DE ADMIN MASTER ---
-      // ALTERADO: Lógica do formulário de Admin
       case AuthMode.registerAdminMaster:
-        title = 'Registrar Admin Master';
-        formFields = [
-          _buildTextField(
-            _emailController,
-            'Email',
-            keyboardType: TextInputType.emailAddress,
-          ),
+        title = "ADMIN MASTER";
+        subtitle = "Registro administrativo.";
+        btnText = "CRIAR ADMIN";
+        fields = [
+          _buildTextField(_usernameController, 'Seu Nome', Icons.person_outline),
           const SizedBox(height: 16),
-          _buildTextField(_usernameController, 'Seu Nome'),
+          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          // REMOVIDO: Campo 'Nome do Setor'
-          // _buildTextField(
-          //   _sectorNameController,
-          //   'Nome do Setor (Ex: Bateria B10)',
-          // ),
-          // const SizedBox(height: 16),
-          _buildTextField(
-            _passwordController,
-            'Senha',
-            obscureText: true,
-            helperText: 'Mín 8, máx 72 caracteres',
-          ),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
         ];
-        primaryButton = _buildPrimaryButton(
-          'Registrar e Entrar',
-          _handleRegister,
-        );
-        secondaryButton = _buildTextButton(
-          'Já tem uma conta? Fazer Login',
-          () => _switchAuthMode(AuthMode.login),
+        footer = TextButton(
+          onPressed: () => _switchAuthMode(AuthMode.login),
+          child: const Text("Cancelar"),
         );
         break;
     }
 
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
+      body: Stack(
+        children: [
+          // 1. Imagem de Fundo
+          Positioned.fill(
+            child: Image.network(
+              'https://images.unsplash.com/photo-1514525253440-b393452e3383?q=80&w=1000&auto=format&fit=crop', 
+              fit: BoxFit.cover,
+              // Fallback caso a imagem não carregue
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.black), 
+            ),
+          ),
+          // 2. Gradiente (Overlay) para escurecer
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.black.withOpacity(0.9), // Mais escuro embaixo
+                    Colors.black,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // 3. Conteúdo Scrollável
+          Center(
             child: SingleChildScrollView(
-              // Permite rolar se o teclado abrir
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // --- LOGO PERSONALIZADA B10 ---
+                  Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primaryYellow, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryYellow.withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          )
+                        ]
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/logob10.png', // <--- SUA LOGO AQUI
+                          height: 120,
+                          width: 120,
+                          fit: BoxFit.cover,
+                            // Ícone de fallback se a imagem ainda não existir (log para debug)
+                            errorBuilder: (context, error, stackTrace) {
+                              debugPrint('Failed to load main logo: $error');
+                              return Container(
+                                height: 120,
+                                width: 120,
+                                color: Colors.black,
+                                child: const Icon(Icons.music_note, size: 50, color: AppColors.primaryYellow),
+                              );
+                            },
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 28,
+                      fontSize: 32,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 40),
+                  
+                  // Campos do Formulário
+                  ...fields,
+                  
                   const SizedBox(height: 32),
-                  ...formFields,
+                  
+                  // Botão Principal
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : (_authMode == AuthMode.login ? _handleLogin : _handleRegister),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24, 
+                            width: 24, 
+                            child: CircularProgressIndicator(color: Colors.black)
+                          )
+                        : Text(btnText),
+                  ),
+                  
                   const SizedBox(height: 24),
-                  primaryButton,
-                  const SizedBox(height: 16),
-                  secondaryButton,
+                  
+                  // Footer (Links)
+                  footer,
                 ],
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // --- Widgets Helpers ---
   Widget _buildTextField(
     TextEditingController controller,
-    String label, {
-    TextInputType? keyboardType,
-    String? helperText,
+    String hint,
+    IconData icon, {
     bool obscureText = false,
+    TextInputType? keyboardType,
   }) {
     return TextField(
       controller: controller,
-      keyboardType: keyboardType,
       obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        helperText: helperText,
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton(String text, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: _isLoading
-          ? null
-          : onPressed, // Desabilita se estiver carregando
-      child: _isLoading
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                color: Colors.black, // Corrigido para o tema
-                strokeWidth: 2,
-              ),
-            )
-          : Text(text),
-    );
-  }
-
-  Widget _buildTextButton(String text, VoidCallback onPressed) {
-    return TextButton(
-      onPressed: _isLoading
-          ? null
-          : onPressed, // Desabilita se estiver carregando
-      child: Text(
-        text,
-        style: TextStyle(color: Theme.of(context).colorScheme.primary),
+        hintText: hint,
+        prefixIcon: Icon(icon),
       ),
     );
   }

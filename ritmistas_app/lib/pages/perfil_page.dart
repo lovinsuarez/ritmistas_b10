@@ -155,6 +155,7 @@ class _PerfilPageState extends State<PerfilPage> {
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.5,
+                                    color: Colors.black,
                                   ),
                                 ),
                               ),

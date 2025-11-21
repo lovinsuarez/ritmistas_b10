@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ritmistas_app/theme.dart';
 
 // --- Modelo de Dados (Sem Alterações) ---
 class RankingEntry {
@@ -32,36 +33,26 @@ class RankingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Cria o controlador de Abas
+    // Usamos um DefaultTabController com Scaffold e AppBar para posicionar a TabBar
     return DefaultTabController(
-      length: 2, // Teremos 2 abas
-      child: Column(
-        children: [
-          // 2. As Abas (Botões)
-          Container(
-            color: Theme.of(context).scaffoldBackgroundColor, // Cor de fundo
-            child: const TabBar(
-              tabs: [
-                Tab(text: "Meu Setor"),
-                Tab(text: "Geral B10"),
-              ],
-            ),
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          elevation: 0,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: "Meu Setor"),
+              Tab(text: "Geral B10"),
+            ],
           ),
-          // 3. O Conteúdo (Páginas)
-          const Expanded(
-            child: TabBarView(
-              children: [
-                // Aba 1: Ranking do Setor
-                // (Chama o novo widget que busca os dados do setor)
-                RankingListView(isGeral: false),
-
-                // Aba 2: Ranking Geral
-                // (Chama o novo widget que busca os dados gerais)
-                RankingListView(isGeral: true),
-              ],
-            ),
-          ),
-        ],
+        ),
+        body: const TabBarView(
+          children: [
+            RankingListView(isGeral: false),
+            RankingListView(isGeral: true),
+          ],
+        ),
       ),
     );
   }
@@ -178,47 +169,53 @@ class _RankingListViewState extends State<RankingListView>
                 final bool isMe = (entry.userId == myUserId);
 
                 return Card(
+                  color: AppColors.cardBackground,
                   elevation: isMe ? 6.0 : 2.0,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 6.0,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     side: isMe
-                        ? BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          )
+                        ? const BorderSide(color: AppColors.primaryYellow, width: 2)
                         : BorderSide.none,
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20.0,
-                      vertical: 10.0,
-                    ),
-                    leading: Text(
-                      '$positionº',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isMe
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.black,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: ListTile(
+                      leading: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 30,
+                            child: Text(
+                              '$positionº',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          CircleAvatar(
+                            backgroundColor: Colors.grey[800],
+                            child: const Icon(Icons.person, color: Colors.grey),
+                          ),
+                        ],
                       ),
-                    ),
-                    title: Text(
-                      entry.username,
-                      style: TextStyle(
-                        fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                      title: Text(
+                        entry.username,
+                        style: TextStyle(
+                          fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    trailing: Text(
-                      '${entry.totalPoints} pts',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+                      trailing: Text(
+                        '${entry.totalPoints} pts',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryYellow,
+                        ),
                       ),
                     ),
                   ),
