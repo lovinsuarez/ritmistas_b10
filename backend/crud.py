@@ -323,3 +323,7 @@ def get_user_dashboard_details(db: Session, user_id: int, sector_id: int):
         "checkins": [], # Pode popular se necessário
         "redeemed_codes": []
     }
+
+def get_user_by_id(db: Session, user_id: int):
+    """Busca um usuário pelo seu ID."""
+    return db.query(models.User).filter(models.User.user_id == user_id).first()
