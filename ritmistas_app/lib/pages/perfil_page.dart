@@ -1,10 +1,12 @@
 // lib/pages/perfil_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Para copiar para a área de transferência
 import 'package:ritmistas_app/main.dart'; // Importa AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// IMPORTANTE: Importa a página de detalhes para a navegação funcionar
+import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart';
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
@@ -31,7 +33,7 @@ class _PerfilPageState extends State<PerfilPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) throw Exception("Não autenticado.");
-    _token = token; // Guarda o token para usar no joinSector
+    _token = token; // Guarda o token
     return _apiService.getUsersMe(token);
   }
 
@@ -231,10 +233,29 @@ class _PerfilPageState extends State<PerfilPage> {
                           child: const Icon(Icons.pie_chart, color: AppColors.primaryYellow),
                         ),
                         title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        trailing: Text(
-                          "${sector['points']} pts",
-                          style: const TextStyle(color: AppColors.primaryYellow, fontWeight: FontWeight.bold, fontSize: 16),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "${sector['points']} pts",
+                              style: const TextStyle(color: AppColors.primaryYellow, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
+                          ],
                         ),
+                        // AQUI: Clica no setor para ver o ranking dele
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SectorRankingDetailPage(
+                                sectorId: sector['sector_id'],
+                                sectorName: sector['sector_name'],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   }).toList()
@@ -260,35 +281,54 @@ class _PerfilPageState extends State<PerfilPage> {
                 // --- 4. Código de Convite (Apenas Líder/Admin) ---
                 if (inviteCode != null) ...[
                   Card(
-                    color: Colors.grey[900],
+                    color: AppColors.primaryYellow, // Fundo Amarelo
+                    elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Colors.white24),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("CONVITE DO SEU SETOR (LÍDER)", style: TextStyle(color: AppColors.primaryYellow, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const Text(
+                            "CÓDIGO DE CONVITE DO SETOR",
+                            style: TextStyle(
+                              color: Colors.black54, 
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
                               Expanded(
                                 child: Text(
                                   inviteCode,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
+                                  style: const TextStyle(
+                                    fontSize: 18, 
+                                    fontWeight: FontWeight.bold, 
+                                    color: Colors.black, // Texto Preto
+                                    letterSpacing: 1
+                                  ),
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.copy, color: Colors.white),
+                                icon: const Icon(Icons.copy, color: Colors.black),
                                 onPressed: () {
                                   Clipboard.setData(ClipboardData(text: inviteCode));
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green)
+                                  );
                                 },
                               ),
                             ],
                           ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Envie para novos membros entrarem no setor.",
+                            style: TextStyle(color: Colors.black45, fontSize: 12),
+                          )
                         ],
                       ),
                     ),

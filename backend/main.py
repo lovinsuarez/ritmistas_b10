@@ -83,9 +83,42 @@ def ranking_geral(db: Session = Depends(get_db), current_user: models.User = Dep
 @app.get("/ranking/sector", response_model=schemas.RankingResponse) # Retorna do primeiro setor (legado) ou erro
 def ranking_sector(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.sectors:
-        return {"ranking": []}
+        return {
+            "my_user_id": current_user.user_id, # <--- ADICIONE ISSO
+            "ranking": []
+        }
     # Retorna o ranking do primeiro setor que o usuário participa
-    return {"ranking": crud.get_sector_ranking(db, current_user.sectors[0].sector_id)}
+    return {
+        "my_user_id": current_user.user_id,
+        "ranking": crud.get_sector_ranking(db, current_user.sectors[0].sector_id)
+    }
+
+@app.get("/ranking/sector/{sector_id}", response_model=schemas.RankingResponse)
+def get_specific_sector_ranking(
+    sector_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """ Retorna o ranking de um setor específico se o usuário fizer parte dele. """
+    
+    # 1. Verifica se o usuário realmente pertence a esse setor
+    # (Isso impede que ele veja ranking de setores que não entrou)
+    user_in_sector = False
+    for s in current_user.sectors:
+        if s.sector_id == sector_id:
+            user_in_sector = True
+            break
+            
+    if not user_in_sector:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Você não pertence a este setor.")
+
+    # 2. Busca o ranking
+    ranking_data = crud.get_sector_ranking(db, sector_id=sector_id)
+    
+    return {
+        "my_user_id": current_user.user_id,
+        "ranking": ranking_data
+    }
 
 # --- LIDER ---
 @app.get("/lider/pending-users", response_model=List[schemas.UserAdminView])

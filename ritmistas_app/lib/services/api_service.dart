@@ -250,6 +250,20 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> getSpecificSectorRanking(String token, int sectorId) async {
+    final url = Uri.parse('$_baseUrl/ranking/sector/$sectorId');
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return data;
+    } else {
+      throw Exception(data['detail'] ?? 'Falha ao buscar ranking do setor');
+    }
+  }
+
   // NOVO: Endpoint para o ranking geral
   Future<Map<String, dynamic>> getGeralRanking(String token) async {
     final url = Uri.parse('$_baseUrl/ranking/geral');
