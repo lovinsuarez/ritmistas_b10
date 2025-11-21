@@ -142,7 +142,57 @@ def get_sector_ranking(db: Session, sector_id: int):
     """
     Calcula o ranking completo para um setor,
     somando pontos de check-ins e códigos resgatados.
+    APENAS PARA USUÁRIOS ATIVOS.
     """
+
+    # 1. Pontos de Check-in
+    checkin_points_sq = db.query(
+        models.CheckIn.user_id,
+        func.sum(models.Activity.points_value).label("total_checkin_points")
+    ).join(models.Activity, models.CheckIn.activity_id == models.Activity.activity_id)\
+     .group_by(models.CheckIn.user_id)\
+     .subquery()
+
+    # 2. Pontos de Códigos 'Unique'
+    unique_code_points_sq = db.query(
+        models.RedeemCode.assigned_user_id.label("user_id"),
+        func.sum(models.RedeemCode.points_value).label("total_unique_points")
+    ).filter(
+        models.RedeemCode.type == models.CodeType.unique,
+        models.RedeemCode.is_redeemed == True
+    ).group_by(models.RedeemCode.assigned_user_id)\
+     .subquery()
+
+    # 3. Pontos de Códigos 'General'
+    general_code_points_sq = db.query(
+        models.GeneralCodeRedemption.user_id,
+        func.sum(models.RedeemCode.points_value).label("total_general_points")
+    ).join(models.RedeemCode, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
+     .group_by(models.GeneralCodeRedemption.user_id)\
+     .subquery()
+
+    # 4. Soma total
+    total_points_col = (
+        func.coalesce(checkin_points_sq.c.total_checkin_points, 0) +
+        func.coalesce(unique_code_points_sq.c.total_unique_points, 0) +
+        func.coalesce(general_code_points_sq.c.total_general_points, 0)
+    ).label("total_points")
+
+    # 5. Query Principal
+    ranking_query = db.query(
+        models.User.user_id,
+        models.User.username,
+        total_points_col 
+    ).outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)\
+    .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)\
+    .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)\
+    .filter(
+        models.User.sector_id == sector_id,
+        models.User.status == models.UserStatus.ACTIVE # <-- FILTRO NOVO: SÓ ATIVOS
+    )\
+    .order_by(total_points_col.desc())
+        
+    return ranking_query.all()
 
     # 1. Pontos de Check-in (Presença)
     checkin_points_sq = db.query(
@@ -273,10 +323,16 @@ def get_user_by_id(db: Session, user_id: int):
 
 def update_user_role(db: Session, user_to_update: models.User, new_role: models.UserRole):
     """Atualiza o 'role' de um usuário."""
+    
+    # Lógica de Rebaixamento: Se virou USER, remove a liderança de qualquer setor
+    if new_role == models.UserRole.user:
+        sector_led = db.query(models.Sector).filter(models.Sector.lider_id == user_to_update.user_id).first()
+        if sector_led:
+            sector_led.lider_id = None
+
     user_to_update.role = new_role
     
-    # CORREÇÃO: Se o usuário for promovido a Líder ou Admin, 
-    # ele deve ser automaticamente ativado (aprovado).
+    # Lógica de Promoção: Se virou LIDER ou ADMIN, ativa a conta automaticamente
     if new_role in [models.UserRole.lider, models.UserRole.admin]:
         user_to_update.status = models.UserStatus.ACTIVE
         
@@ -373,8 +429,28 @@ def create_sector(db: Session, sector_name: str):
 
 # NOVO: Função para o Admin Master ver todos os setores
 def get_all_sectors(db: Session):
-    """Retorna todos os setores."""
-    return db.query(models.Sector).all()
+    """Retorna todos os setores (com autocorreção de líderes inválidos)."""
+    sectors = db.query(models.Sector).all()
+    
+    dirty = False # Marca se precisamos salvar alterações no banco
+    
+    for sector in sectors:
+        if sector.lider_id:
+            # Verifica quem é o líder apontado
+            lider = db.query(models.User).filter(models.User.user_id == sector.lider_id).first()
+            
+            # Se o líder não existe MAIS ou foi rebaixado para 'user'
+            if not lider or lider.role != models.UserRole.lider:
+                sector.lider_id = None # Remove a liderança inválida
+                db.add(sector)
+                dirty = True
+    
+    if dirty:
+        db.commit() # Salva as correções
+        # Busca a lista limpa novamente
+        return db.query(models.Sector).all()
+        
+    return sectors
 
 # NOVO: Função para o Admin Master ver todos os Líderes
 def get_liders(db: Session):
@@ -410,9 +486,53 @@ def assign_lider_to_sector(db: Session, lider_id: int, sector_id: int):
 # NOVO: Função para o Ranking Geral (B10)
 def get_geral_ranking(db: Session):
     """
-    Calcula o ranking completo de TODOS os usuários,
-    somando pontos de check-ins e códigos resgatados.
+    Calcula o ranking completo de TODOS os usuários ATIVOS.
     """
+
+    # (Subqueries iguais as de cima...)
+    checkin_points_sq = db.query(
+        models.CheckIn.user_id,
+        func.sum(models.Activity.points_value).label("total_checkin_points")
+    ).join(models.Activity, models.CheckIn.activity_id == models.Activity.activity_id)\
+     .group_by(models.CheckIn.user_id)\
+     .subquery()
+
+    unique_code_points_sq = db.query(
+        models.RedeemCode.assigned_user_id.label("user_id"),
+        func.sum(models.RedeemCode.points_value).label("total_unique_points")
+    ).filter(
+        models.RedeemCode.type == models.CodeType.unique,
+        models.RedeemCode.is_redeemed == True
+    ).group_by(models.RedeemCode.assigned_user_id)\
+     .subquery()
+
+    general_code_points_sq = db.query(
+        models.GeneralCodeRedemption.user_id,
+        func.sum(models.RedeemCode.points_value).label("total_general_points")
+    ).join(models.RedeemCode, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
+     .group_by(models.GeneralCodeRedemption.user_id)\
+     .subquery()
+
+    total_points_col = (
+        func.coalesce(checkin_points_sq.c.total_checkin_points, 0) +
+        func.coalesce(unique_code_points_sq.c.total_unique_points, 0) +
+        func.coalesce(general_code_points_sq.c.total_general_points, 0)
+    ).label("total_points")
+
+    ranking_query = db.query(
+        models.User.user_id,
+        models.User.username,
+        total_points_col 
+    ).outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)\
+    .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)\
+    .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)\
+    .filter(
+        models.User.role != models.UserRole.admin,
+        models.User.status == models.UserStatus.ACTIVE # <-- FILTRO NOVO: SÓ ATIVOS
+    )\
+    .order_by(total_points_col.desc())
+
+    return ranking_query.all()
 
     # 1. Pontos de Check-in (Presença)
     checkin_points_sq = db.query(
