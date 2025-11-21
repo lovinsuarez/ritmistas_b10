@@ -13,6 +13,8 @@ import 'package:ritmistas_app/main.dart'; // Para o LoginPage
 import 'package:ritmistas_app/widgets/shared_widgets.dart';
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
+// NOVO IMPORT: A página de aprovações
+import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -70,7 +72,7 @@ class _HomePageState extends State<HomePage> {
           );
         }
 
-        // --- ALTERADO: Decisão com 3 Níveis ---
+        // --- Decisão com 3 Níveis ---
         final String role = snapshot.data!;
 
         switch (role) {
@@ -80,17 +82,14 @@ class _HomePageState extends State<HomePage> {
 
           // --- Caso 1: LÍDER ---
           case "1":
-            // O Líder usará o antigo "AdminScaffold", que renomeamos para "LiderScaffold"
             return LiderScaffold(onLogout: _handleLogout);
 
           // --- Caso 0: ADMIN MASTER ---
           case "0":
-            // O Admin Master precisa de um Scaffold novo
             return AdminMasterScaffold(onLogout: _handleLogout);
 
           // --- Padrão: Desconhecido ---
           default:
-            // Se o 'role' for inválido, desloga por segurança
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _handleLogout();
             });
@@ -104,7 +103,6 @@ class _HomePageState extends State<HomePage> {
 }
 
 // --- LAYOUT DO USUÁRIO (role: "2") ---
-// (Sem alterações, já está perfeito para o Usuário)
 class UserScaffold extends StatefulWidget {
   final VoidCallback onLogout;
   const UserScaffold({super.key, required this.onLogout});
@@ -119,7 +117,7 @@ class _UserScaffoldState extends State<UserScaffold> {
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
     ResgatePage(),
-    RankingPage(), // Esta página deve ser atualizada para chamar getSectorRanking
+    RankingPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -159,8 +157,7 @@ class _UserScaffoldState extends State<UserScaffold> {
   }
 }
 
-// --- ALTERADO: LAYOUT DO LÍDER (role: "1") ---
-// (Era 'AdminScaffold', agora é 'LiderScaffold')
+// --- LAYOUT DO LÍDER (role: "1") ---
 class LiderScaffold extends StatefulWidget {
   final VoidCallback onLogout;
   const LiderScaffold({super.key, required this.onLogout});
@@ -172,11 +169,11 @@ class LiderScaffold extends StatefulWidget {
 class _LiderScaffoldState extends State<LiderScaffold> {
   int _selectedIndex = 0; // Começa em Cadastrar
 
-  // Estas são as páginas que o LÍDER usará
-  // Elas precisarão ser atualizadas para chamar os endpoints /lider/...
+  // ADICIONADA A PÁGINA DE APROVAÇÕES (Índice 2)
   static const List<Widget> _widgetOptions = <Widget>[
     AdminCadastroPage(),
     AdminAtividadesPage(),
+    AdminAprovacoesPage(), // <-- NOVA PÁGINA
     AdminUsuariosPage(),
     AdminRankingPage(),
     PerfilPage(),
@@ -189,7 +186,7 @@ class _LiderScaffoldState extends State<LiderScaffold> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'LÍDER - Ritmistas B10', // Título alterado
+      title: 'LÍDER - Ritmistas B10',
       actions: [
         IconButton(
           icon: const Icon(Icons.logout),
@@ -209,6 +206,12 @@ class _LiderScaffoldState extends State<LiderScaffold> {
             icon: Icon(Icons.list_alt),
             label: 'Atividades',
           ),
+          // --- NOVO ÍCONE DE APROVAÇÃO ---
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notification_important),
+            label: 'Aprovar',
+          ),
+          // -------------------------------
           BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Usuários'),
           BottomNavigationBarItem(
             icon: Icon(Icons.leaderboard),
@@ -225,8 +228,7 @@ class _LiderScaffoldState extends State<LiderScaffold> {
   }
 }
 
-// --- NOVO: LAYOUT DO ADMIN MASTER (role: "0") ---
-// (Este é o novo Scaffold para o Admin Master)
+// --- LAYOUT DO ADMIN MASTER (role: "0") ---
 class AdminMasterScaffold extends StatefulWidget {
   final VoidCallback onLogout;
   const AdminMasterScaffold({super.key, required this.onLogout});
@@ -238,11 +240,9 @@ class AdminMasterScaffold extends StatefulWidget {
 class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
   int _selectedIndex = 0; // Começa em Setores
 
-  // TODO: Crie as páginas para o Admin Master
-  // Por enquanto, usaremos placeholders
   static final List<Widget> _widgetOptions = <Widget>[
     const AdminMasterSetoresPage(),
-    const AdminMasterLideresPage(), // <-- Esta é a nova página
+    const AdminMasterLideresPage(),
     const PerfilPage(),
   ];
 

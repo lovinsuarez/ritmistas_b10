@@ -274,6 +274,12 @@ def get_user_by_id(db: Session, user_id: int):
 def update_user_role(db: Session, user_to_update: models.User, new_role: models.UserRole):
     """Atualiza o 'role' de um usuário."""
     user_to_update.role = new_role
+    
+    # CORREÇÃO: Se o usuário for promovido a Líder ou Admin, 
+    # ele deve ser automaticamente ativado (aprovado).
+    if new_role in [models.UserRole.lider, models.UserRole.admin]:
+        user_to_update.status = models.UserStatus.ACTIVE
+        
     db.commit()
     db.refresh(user_to_update)
     return user_to_update

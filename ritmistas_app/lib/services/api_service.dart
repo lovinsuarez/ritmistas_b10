@@ -376,6 +376,53 @@ class ApiService {
     }
   }
 
+  // --- NOVAS FUNÇÕES DE APROVAÇÃO DO LÍDER ---
+
+  // Lista usuários pendentes
+  Future<List<UserAdminView>> getPendingUsers(String token) async {
+    final url = Uri.parse('$_baseUrl/lider/pending-users');
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => UserAdminView.fromJson(json)).toList();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['detail'] ?? 'Falha ao buscar aprovações');
+    }
+  }
+
+  // Aprova usuário
+  Future<void> approveUser(String token, int userId) async {
+    final url = Uri.parse('$_baseUrl/lider/approve-user/$userId');
+    final response = await http.put(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['detail'] ?? 'Falha ao aprovar usuário');
+    }
+  }
+
+  // Rejeita usuário
+  Future<void> rejectUser(String token, int userId) async {
+    final url = Uri.parse('$_baseUrl/lider/reject-user/$userId');
+    final response = await http.delete(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode != 200) { // Retorna 204 OK
+      // Se não for 204 nem 200, deu erro
+      if (response.statusCode != 204) {
+         final errorData = jsonDecode(response.body);
+         throw Exception(errorData['detail'] ?? 'Falha ao rejeitar usuário');
+      }
+    }
+  }
+
   // --- Funções de Admin Master (role: '0') ---
 
   // NOVO: Criar Setor
