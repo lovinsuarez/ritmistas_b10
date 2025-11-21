@@ -1,23 +1,19 @@
-# C:\Users\jeatk\OneDrive\Documents\GitHub\ritimistas_b10\backend\models.py
-
+# backend/models.py
 import enum
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint, UUID
+    Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint, UUID, Table
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-
-# IMPORTANTE: Esta linha importa o 'Base' do arquivo database.py
 from database import Base 
 
-# Define os ENUMs (tipos especiais) que o PostgreSQL usará
+# --- ENUMS ---
 class UserRole(enum.Enum):
     admin = "0"   # Admin Master
     lider = "1"   # Líder de Setor
     user = "2"    # Usuário Padrão
 
-# NOVO: Enum para o status de aprovação do usuário
 class UserStatus(enum.Enum):
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
@@ -30,7 +26,16 @@ class CodeType(enum.Enum):
     general = "general"
     unique = "unique"
 
-# Modelo da Tabela 'Sectors' (Setores/Grupos)
+# --- TABELA DE ASSOCIAÇÃO (Muitos para Muitos) ---
+# Tabela "invisível" que liga usuários a setores
+user_sectors = Table(
+    'user_sectors', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.user_id')),
+    Column('sector_id', Integer, ForeignKey('sectors.sector_id'))
+)
+
+# --- MODELOS ---
+
 class Sector(Base):
     __tablename__ = "sectors"
     
@@ -38,19 +43,17 @@ class Sector(Base):
     name = Column(String(100), nullable=False)
     invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
     
-    lider_id = Column(
-        Integer, 
-        ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), 
-        nullable=True
-    )
+    # Líder do setor (Um setor tem 1 líder principal por enquanto para gestão)
+    lider_id = Column(Integer, ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), nullable=True)
     
-    # Relacionamentos do SQLAlchemy (lógica do Python)
     lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
-    users = relationship("User", back_populates="sector", foreign_keys="[User.sector_id]")
+    
+    # RELAÇÃO MUDADA: Um setor tem vários usuários (através da tabela de associação)
+    members = relationship("User", secondary=user_sectors, back_populates="sectors")
+    
     activities = relationship("Activity", back_populates="sector")
     redeem_codes = relationship("RedeemCode", back_populates="sector")
 
-# Modelo da Tabela 'Users' (Usuários)
 class User(Base):
     __tablename__ = "users"
     
@@ -59,25 +62,15 @@ class User(Base):
     username = Column(String(50), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
-    
-    # NOVO: Coluna de status de aprovação
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
     
-    sector_id = Column(
-        Integer, 
-        ForeignKey("sectors.sector_id", name="fk_user_sector"), 
-        nullable=True
-    ) 
+    # REMOVIDO: sector_id = Column(...) -> Não existe mais setor único!
     
-    # Relacionamentos do SQLAlchemy (lógica do Python)
-    sector = relationship("Sector", back_populates="users", foreign_keys=[sector_id])
+    # RELAÇÃO MUDADA: Um usuário pode estar em vários setores
+    sectors = relationship("Sector", secondary=user_sectors, back_populates="members")
     
-    led_sector = relationship(
-        "Sector", 
-        back_populates="lider", 
-        foreign_keys="[Sector.lider_id]", 
-        uselist=False
-    )
+    # Se for líder, qual setor ele lidera?
+    led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
 
     checkins = relationship("CheckIn", back_populates="user")
     created_activities = relationship("Activity", back_populates="creator")
@@ -85,7 +78,6 @@ class User(Base):
     assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
 
-# Modelo da Tabela 'Activities' (Eventos/Atividades)
 class Activity(Base):
     __tablename__ = "activities"
     
@@ -96,6 +88,7 @@ class Activity(Base):
     address = Column(String(255), nullable=True) 
     activity_date = Column(DateTime, nullable=False)
     points_value = Column(Integer, nullable=False, default=10) 
+    created_at = Column(DateTime, server_default=func.now()) # NOVO: Data de criação para auditoria
     
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
@@ -104,7 +97,6 @@ class Activity(Base):
     creator = relationship("User", back_populates="created_activities")
     checkins = relationship("CheckIn", back_populates="activity")
 
-# Modelo da Tabela 'CheckIns' (Presenças)
 class CheckIn(Base):
     __tablename__ = "checkins"
     
@@ -118,7 +110,6 @@ class CheckIn(Base):
     
     __table_args__ = (UniqueConstraint('user_id', 'activity_id', name='_user_activity_uc'),)
 
-# Modelo da Tabela 'RedeemCodes' (Códigos de Resgate)
 class RedeemCode(Base):
     __tablename__ = "redeem_codes"
     
@@ -127,6 +118,7 @@ class RedeemCode(Base):
     points_value = Column(Integer, nullable=False, default=10)
     type = Column(Enum(CodeType), nullable=False)
     is_redeemed = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now()) # NOVO: Auditoria
     
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
@@ -137,7 +129,6 @@ class RedeemCode(Base):
     assigned_user = relationship("User", back_populates="assigned_codes", foreign_keys=[assigned_user_id])
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="code")
 
-# Modelo da Tabela 'GeneralCodeRedemptions' (Resgates de Códigos Gerais)
 class GeneralCodeRedemption(Base):
     __tablename__ = "general_code_redemptions"
     
