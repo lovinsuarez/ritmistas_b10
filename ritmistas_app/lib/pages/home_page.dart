@@ -1,8 +1,8 @@
 // lib/pages/home_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:curved_navigation_bar/curved_navigation_bar.dart'; // Pacote da barra curva
-import 'package:ritmistas_app/main.dart'; // Cores e Tema
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
@@ -15,8 +15,9 @@ import 'package:ritmistas_app/main.dart' show LoginPage;
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
-import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart'; 
+// IMPORTANTE: Importa a página de ranking do admin master que criamos
+import 'package:ritmistas_app/pages/admin_master_ranking_page.dart'; 
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -80,13 +81,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- WIDGET AUXILIAR PARA O TÍTULO COM LOGO ---
+// --- WIDGET DA BARRA SUPERIOR COM LOGO ONLINE ---
 Widget _buildAppBarTitle(String title) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       ClipOval(
-        child: Image.network( // <--- Mudamos para network
+        child: Image.network(
           'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
           height: 30,
           width: 30,
@@ -116,7 +117,7 @@ class UserScaffold extends StatefulWidget {
 }
 
 class _UserScaffoldState extends State<UserScaffold> {
-  int _selectedIndex = 0; // Começa no Perfil
+  int _selectedIndex = 0; 
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
@@ -141,9 +142,9 @@ class _UserScaffoldState extends State<UserScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
-          Icon(Icons.qr_code_scanner, size: 30, color: Colors.black), // Resgate
-          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
+          Icon(Icons.person, size: 30, color: Colors.black), 
+          Icon(Icons.qr_code_scanner, size: 30, color: Colors.black),
+          Icon(Icons.emoji_events, size: 30, color: Colors.black),
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
@@ -170,7 +171,7 @@ class LiderScaffold extends StatefulWidget {
 }
 
 class _LiderScaffoldState extends State<LiderScaffold> {
-  int _selectedIndex = 0; // Começa no Perfil
+  int _selectedIndex = 0;
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
@@ -198,12 +199,12 @@ class _LiderScaffoldState extends State<LiderScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
-          Icon(Icons.add_circle, size: 30, color: Colors.black), // Cadastro
-          Icon(Icons.list_alt, size: 30, color: Colors.black), // Atividades
-          Icon(Icons.notification_important, size: 30, color: Colors.black), // Aprovar
-          Icon(Icons.group, size: 30, color: Colors.black), // Usuários
-          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
+          Icon(Icons.person, size: 30, color: Colors.black),
+          Icon(Icons.add_circle, size: 30, color: Colors.black),
+          Icon(Icons.list_alt, size: 30, color: Colors.black),
+          Icon(Icons.notification_important, size: 30, color: Colors.black),
+          Icon(Icons.group, size: 30, color: Colors.black),
+          Icon(Icons.emoji_events, size: 30, color: Colors.black),
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
@@ -230,15 +231,14 @@ class AdminMasterScaffold extends StatefulWidget {
 }
 
 class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
-  int _selectedIndex = 0; // Começa no Perfil
+  int _selectedIndex = 0;
 
-  // LISTA ATUALIZADA COM A NOVA PÁGINA DE RELATÓRIOS
   static final List<Widget> _widgetOptions = <Widget>[
+    const PerfilPage(),
     const AdminMasterSetoresPage(),
     const AdminMasterLideresPage(),
-    const AdminMasterRankingPage(), // <--- NOVA ABA DE RANKING (Índice 2)
-    const AdminMasterRelatoriosPage(), // <--- Auditoria (Índice 3)
-    const PerfilPage(), // (Índice 4)
+    const AdminMasterRankingPage(), // Página de ranking do Master
+    const AdminMasterRelatoriosPage(), // Relatórios
   ];
 
   @override
@@ -258,11 +258,11 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
-          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
-          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking (NOVO)
-          Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon(Icons.person, size: 30, color: Colors.black),
+          Icon(Icons.apartment, size: 30, color: Colors.black),
+          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black),
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ícone Ranking
+          Icon(Icons.assessment, size: 30, color: Colors.black),
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

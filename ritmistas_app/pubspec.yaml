@@ -35,4 +35,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/logoB10.png
+    #- assets/images/logob10.png

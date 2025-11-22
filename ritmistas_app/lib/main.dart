@@ -1,3 +1,5 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
@@ -23,13 +25,12 @@ final ThemeData appTheme = ThemeData(
     surface: AppColors.cardBackground,
     background: AppColors.background,
   ),
-  fontFamily: 'Roboto', // Fonte padrão moderna
+  fontFamily: 'Roboto',
   
-  // Estilo dos Botões Elevados (Amarelos)
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColors.primaryYellow,
-      foregroundColor: Colors.black, // Texto preto no amarelo
+      foregroundColor: Colors.black,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -37,7 +38,6 @@ final ThemeData appTheme = ThemeData(
     ),
   ),
   
-  // Estilo dos Botões de Texto
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColors.primaryYellow,
@@ -45,7 +45,6 @@ final ThemeData appTheme = ThemeData(
     ),
   ),
   
-  // Estilo dos Campos de Texto
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: AppColors.cardBackground,
@@ -82,7 +81,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- TELA DE LOGIN / REGISTRO (COM NOVO VISUAL) ---
+// --- TELA DE LOGIN / REGISTRO ---
 
 enum AuthMode { login, registerUser, registerAdminMaster }
 
@@ -103,7 +102,6 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _inviteCodeController = TextEditingController();
 
-  // --- LÓGICA DE LOGIN ---
   Future<void> _handleLogin() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
@@ -132,7 +130,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // --- LÓGICA DE REGISTRO ---
   Future<void> _handleRegister() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
@@ -206,7 +203,6 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // --- CONSTRUÇÃO DA TELA (VISUAL NOVO) ---
   @override
   Widget build(BuildContext context) {
     String title;
@@ -215,7 +211,6 @@ class _LoginPageState extends State<LoginPage> {
     List<Widget> fields;
     Widget footer;
 
-    // Configuração dos textos e campos baseados no modo
     switch (_authMode) {
       case AuthMode.login:
         title = "BEM-VINDO";
@@ -280,16 +275,15 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Imagem de Fundo
+          // Imagem de Fundo (Genérica da internet)
           Positioned.fill(
             child: Image.network(
               'https://images.unsplash.com/photo-1514525253440-b393452e3383?q=80&w=1000&auto=format&fit=crop', 
               fit: BoxFit.cover,
-              // Fallback caso a imagem não carregue
               errorBuilder: (context, error, stackTrace) => Container(color: Colors.black), 
             ),
           ),
-          // 2. Gradiente (Overlay) para escurecer
+          // Gradiente
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -298,14 +292,14 @@ class _LoginPageState extends State<LoginPage> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.black.withOpacity(0.4),
-                    Colors.black.withOpacity(0.9), // Mais escuro embaixo
+                    Colors.black.withOpacity(0.9),
                     Colors.black,
                   ],
                 ),
               ),
             ),
           ),
-          // 3. Conteúdo Scrollável
+          // Conteúdo
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -313,7 +307,8 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // --- LOGO PERSONALIZADA B10 ---
+                  
+                  // --- LOGO PELA INTERNET (Link do GitHub) ---
                   Center(
                     child: Container(
                       decoration: BoxDecoration(
@@ -328,20 +323,21 @@ class _LoginPageState extends State<LoginPage> {
                         ]
                       ),
                       child: ClipOval(
-                        child: Image.network( // <--- Mudamos para network
+                        child: Image.network(
                           'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
                           height: 120,
                           width: 120,
                           fit: BoxFit.cover,
-                          // Se der erro ou demorar, mostra um ícone
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
-                            return const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow));
+                            return const SizedBox(height: 120, width: 120, child: Center(child: CircularProgressIndicator(color: AppColors.primaryYellow)));
                           },
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            height: 120, width: 120, color: Colors.grey[900],
-                            child: const Icon(Icons.music_note, color: AppColors.primaryYellow, size: 50),
-                          ),
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 120, width: 120, color: Colors.grey[900],
+                              child: const Icon(Icons.music_note, size: 50, color: AppColors.primaryYellow),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -366,27 +362,15 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 40),
-                  
-                  // Campos do Formulário
                   ...fields,
-                  
                   const SizedBox(height: 32),
-                  
-                  // Botão Principal
                   ElevatedButton(
                     onPressed: _isLoading ? null : (_authMode == AuthMode.login ? _handleLogin : _handleRegister),
                     child: _isLoading
-                        ? const SizedBox(
-                            height: 24, 
-                            width: 24, 
-                            child: CircularProgressIndicator(color: Colors.black)
-                          )
+                        ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.black))
                         : Text(btnText),
                   ),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Footer (Links)
                   footer,
                 ],
               ),
