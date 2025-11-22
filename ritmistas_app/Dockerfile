@@ -1,37 +1,26 @@
-# ESTÁGIO 1: Construir o App (Build Stage)
-# Usando a imagem compatível
-FROM instrumentisto/flutter:3.22.2 AS build
+# Usamos uma versão mais recente do Flutter que suporta o Mobile Scanner 6.0+
+FROM cirrusci/flutter:3.24.3 AS build
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de dependência
-COPY pubspec.yaml pubspec.lock ./
+# Copia os arquivos de configuração
+COPY pubspec.yaml ./
 
-# --- A CORREÇÃO MÁGICA ---
-# Apaga o arquivo de bloqueio do Windows para o Linux calcular o dele
+# Remove o arquivo de trava de versão do Windows para não conflitar com o Linux
 RUN rm -f pubspec.lock
-# -------------------------
 
-# Instala as dependências (agora ele vai achar as versões compatíveis sozinho)
+# Instala dependências
 RUN flutter pub get
 
-# Copia o resto do código e os assets
+# Copia o código (Note que removi a linha de assets para evitar aquele erro de arquivo não encontrado)
 COPY lib/ ./lib/
 COPY web/ ./web/
-COPY assets/ ./assets/
 
-# Executa o comando de build
+# Compila para web
 RUN flutter build web --release --no-tree-shake-icons
 
-# ESTÁGIO 2: Servir o App (Serve Stage)
-FROM nginx:alpine as final
-
-# Copia os arquivos construídos
+# Servidor
+FROM nginx:alpine
 COPY --from=build /app/build/web /usr/share/nginx/html
-
-# Copia a configuração do Nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expõe a porta 80
 EXPOSE 80
