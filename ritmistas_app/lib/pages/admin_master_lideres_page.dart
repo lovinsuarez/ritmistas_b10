@@ -1,6 +1,7 @@
 // lib/pages/admin_master_lideres_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,10 +14,8 @@ class AdminMasterLideresPage extends StatefulWidget {
 
 class _AdminMasterLideresPageState extends State<AdminMasterLideresPage>
     with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
+      
   late TabController _tabController;
-
-  // NOVO: Criamos uma chave para o 'AllLidersListView'
-  // Isso permite que a 'AllUsersListView' mande ele recarregar
   final GlobalKey<_AllLidersListViewState> _lidersListKey = GlobalKey();
 
   @override
@@ -33,34 +32,33 @@ class _AdminMasterLideresPageState extends State<AdminMasterLideresPage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); 
     return Column(
       children: [
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Promover Usuários'),
-            Tab(text: 'Gerenciar Líderes'),
-          ],
+        Container(
+          color: AppColors.cardBackground,
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.primaryYellow,
+            labelColor: AppColors.primaryYellow,
+            unselectedLabelColor: Colors.grey,
+            tabs: const [
+              Tab(text: 'Promover Usuários'),
+              Tab(text: 'Gerenciar Líderes'),
+            ],
+          ),
         ),
         Expanded(
           child: TabBarView(
             controller: _tabController,
             children: [
-              // --- Aba 1: Lista de Usuários para Promover ---
               AllUsersListView(
-                // NOVO: Passa a chave para a outra aba
                 onUserPromoted: () {
-                  // Manda a aba 'Gerenciar Líderes' recarregar
                   _lidersListKey.currentState?._refresh();
-                  // Muda para a aba de líderes
                   _tabController.animateTo(1);
                 },
               ),
-              // --- Aba 2: Lista de Líderes para Rebaixar ---
-              AllLidersListView(
-                key: _lidersListKey, // NOVO: Atribui a chave
-              ),
+              AllLidersListView(key: _lidersListKey),
             ],
           ),
         ),
@@ -69,21 +67,18 @@ class _AdminMasterLideresPageState extends State<AdminMasterLideresPage>
   }
 
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => true; 
 }
 
-// --- WIDGET DA ABA 1: PROMOVER USUÁRIOS ---
+// --- ABA 1: PROMOVER USUÁRIOS ---
 class AllUsersListView extends StatefulWidget {
-  // NOVO: Função de callback
   final VoidCallback onUserPromoted;
-
   const AllUsersListView({super.key, required this.onUserPromoted});
   @override
   State<AllUsersListView> createState() => _AllUsersListViewState();
 }
 
-class _AllUsersListViewState extends State<AllUsersListView>
-    with AutomaticKeepAliveClientMixin {
+class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepAliveClientMixin {
   final ApiService _apiService = ApiService();
   late Future<List<UserAdminView>> _usersFuture;
   String? _token;
@@ -115,11 +110,9 @@ class _AllUsersListViewState extends State<AllUsersListView>
     );
   }
 
-  // --- ALTERADO: Esta função agora abre um diálogo ---
   Future<void> _handlePromote(UserAdminView user) async {
     if (_token == null) return;
 
-    // 1. Busca todos os setores
     List<Sector> allSectors;
     try {
       allSectors = await _apiService.getAllSectors(_token!);
@@ -128,22 +121,19 @@ class _AllUsersListViewState extends State<AllUsersListView>
       return;
     }
 
-    // 2. Filtra por setores que AINDA NÃO TÊM LÍDER
-    final availableSectors =
-        allSectors.where((s) => s.liderId == null).toList();
+    final availableSectors = allSectors.where((s) => s.liderId == null).toList();
 
     if (availableSectors.isEmpty) {
-      _showError(
-          "Não há setores disponíveis sem líder. Crie um setor primeiro.");
+      _showError("Não há setores sem líder. Crie um setor primeiro.");
       return;
     }
 
-    // 3. Mostra o diálogo para escolher o setor
     final selectedSector = await showDialog<Sector>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('Promover ${user.username}'),
+          backgroundColor: AppColors.cardBackground,
+          title: Text('Promover ${user.username}', style: const TextStyle(color: Colors.white)),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -152,8 +142,8 @@ class _AllUsersListViewState extends State<AllUsersListView>
               itemBuilder: (context, index) {
                 final sector = availableSectors[index];
                 return ListTile(
-                  leading: const Icon(Icons.apartment),
-                  title: Text(sector.name),
+                  leading: const Icon(Icons.apartment, color: AppColors.primaryYellow),
+                  title: Text(sector.name, style: const TextStyle(color: Colors.white)),
                   onTap: () => Navigator.of(ctx).pop(sector),
                 );
               },
@@ -169,32 +159,21 @@ class _AllUsersListViewState extends State<AllUsersListView>
       },
     );
 
-    // 4. Se um setor foi selecionado, executa as duas chamadas
     if (selectedSector != null) {
       try {
-        // Ação 1: Promove o usuário para Líder
         await _apiService.promoteUserToLider(_token!, user.userId);
-
-        // Ação 2: Designa o novo líder ao setor escolhido
-        await _apiService.assignLiderToSector(
-          _token!,
-          selectedSector.sectorId,
-          user.userId,
-        );
+        await _apiService.assignLiderToSector(_token!, selectedSector.sectorId, user.userId);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text(
-                    '${user.username} foi promovido e agora lidera ${selectedSector.name}!'),
-                backgroundColor: Colors.green),
+              content: Text('${user.username} agora lidera ${selectedSector.name}!'),
+              backgroundColor: Colors.green
+            ),
           );
         }
-
-        // Manda a lista de "promover" recarregar (usuário sumirá)
-        _refresh();
-        // Manda a lista de "líderes" recarregar (usuário aparecerá lá)
-        widget.onUserPromoted();
+        _refresh(); 
+        widget.onUserPromoted(); 
       } catch (e) {
         _showError(e.toString());
       }
@@ -207,31 +186,29 @@ class _AllUsersListViewState extends State<AllUsersListView>
     return FutureBuilder<List<UserAdminView>>(
       future: _usersFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-              child: Text(
-                  'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Nenhum usuário comum encontrado.'));
-        }
-        final users = snapshot.data!;
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return Center(child: Text('Erro: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+        
+        final users = snapshot.data ?? [];
+        if (users.isEmpty) return const Center(child: Text('Nenhum usuário comum.', style: TextStyle(color: Colors.grey)));
+
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView.builder(
             itemCount: users.length,
             itemBuilder: (context, index) {
               final user = users[index];
-              return ListTile(
-                leading: const Icon(Icons.person),
-                title: Text(user.username),
-                subtitle: Text(user.email),
-                trailing: ElevatedButton(
-                  child: const Text('Promover'),
-                  onPressed: () => _handlePromote(user),
+              return Card(
+                color: AppColors.cardBackground,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: ListTile(
+                  leading: const CircleAvatar(backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white)),
+                  title: Text(user.username, style: const TextStyle(color: Colors.white)),
+                  subtitle: Text(user.email, style: const TextStyle(color: Colors.grey)),
+                  trailing: ElevatedButton(
+                    child: const Text('Promover'),
+                    onPressed: () => _handlePromote(user),
+                  ),
                 ),
               );
             },
@@ -240,21 +217,17 @@ class _AllUsersListViewState extends State<AllUsersListView>
       },
     );
   }
-
-  @override
-  bool get wantKeepAlive => true;
+  @override bool get wantKeepAlive => true;
 }
 
-// --- WIDGET DA ABA 2: GERENCIAR LÍDERES ---
+// --- ABA 2: GERENCIAR LÍDERES (COM BOTÃO DE ORÇAMENTO) ---
 class AllLidersListView extends StatefulWidget {
   const AllLidersListView({super.key});
   @override
   State<AllLidersListView> createState() => _AllLidersListViewState();
 }
 
-// ALTERADO: Adicionado 'GlobalKey'
-class _AllLidersListViewState extends State<AllLidersListView>
-    with AutomaticKeepAliveClientMixin {
+class _AllLidersListViewState extends State<AllLidersListView> with AutomaticKeepAliveClientMixin {
   final ApiService _apiService = ApiService();
   late Future<List<UserAdminView>> _lidersFuture;
   String? _token;
@@ -272,7 +245,6 @@ class _AllLidersListViewState extends State<AllLidersListView>
     return _apiService.getAllLiders(_token!);
   }
 
-  // ALTERADO: Esta função agora é PÚBLICA (para a outra aba chamar)
   Future<void> _refresh() async {
     setState(() {
       _lidersFuture = _loadLiders();
@@ -280,16 +252,67 @@ class _AllLidersListViewState extends State<AllLidersListView>
     await _lidersFuture;
   }
 
+  // --- NOVO: Adicionar Orçamento ao Líder ---
+  void _showAddBudgetDialog(UserAdminView lider) {
+    final TextEditingController pointsCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text("Adicionar Orçamento para ${lider.username}", style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Estes pontos poderão ser distribuídos pelo líder para sua equipe.",
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pointsCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: "Quantidade de Pontos",
+                prefixIcon: Icon(Icons.add_circle, color: AppColors.primaryYellow),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              final int? points = int.tryParse(pointsCtrl.text);
+              if (points == null || points <= 0) return;
+              
+              Navigator.pop(ctx); // Fecha dialog
+              try {
+                await _apiService.addBudget(_token!, lider.userId, points);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Adicionado $points pts para ${lider.username}!"), backgroundColor: Colors.green)
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red)
+                );
+              }
+            },
+            child: const Text("Adicionar"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleDemote(UserAdminView lider) async {
     if (_token == null) return;
     try {
       await _apiService.demoteLiderToUser(_token!, lider.userId);
-      _refresh(); // Atualiza a lista
+      _refresh();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -300,32 +323,56 @@ class _AllLidersListViewState extends State<AllLidersListView>
     return FutureBuilder<List<UserAdminView>>(
       future: _lidersFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-              child: Text(
-                  'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Nenhum líder encontrado.'));
-        }
-        final liders = snapshot.data!;
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return Center(child: Text('Erro: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+        
+        final liders = snapshot.data ?? [];
+        if (liders.isEmpty) return const Center(child: Text('Nenhum líder encontrado.', style: TextStyle(color: Colors.grey)));
+
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView.builder(
             itemCount: liders.length,
             itemBuilder: (context, index) {
               final lider = liders[index];
-              return ListTile(
-                leading: const Icon(Icons.admin_panel_settings),
-                title: Text(lider.username),
-                subtitle: Text(lider.email),
-                trailing: TextButton(
-                  child: const Text('Rebaixar',
-                      style: TextStyle(color: Colors.red)),
-                  onPressed: () => _handleDemote(lider),
+              return Card(
+                color: AppColors.cardBackground,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const CircleAvatar(backgroundColor: AppColors.primaryYellow, child: Icon(Icons.star, color: Colors.black)),
+                        title: Text(lider.username, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        subtitle: Text(lider.email, style: const TextStyle(color: Colors.grey)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            // Botão Rebaixar (Pequeno e vermelho)
+                            TextButton(
+                              onPressed: () => _handleDemote(lider),
+                              child: const Text("Rebaixar", style: TextStyle(color: Colors.red)),
+                            ),
+                            const SizedBox(width: 8),
+                            // Botão Adicionar Orçamento (Amarelo)
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.attach_money, size: 18),
+                              label: const Text("Dar Orçamento"),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)
+                              ),
+                              onPressed: () => _showAddBudgetDialog(lider),
+                            ),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
                 ),
               );
             },
@@ -334,7 +381,5 @@ class _AllLidersListViewState extends State<AllLidersListView>
       },
     );
   }
-
-  @override
-  bool get wantKeepAlive => true;
+  @override bool get wantKeepAlive => true;
 }
