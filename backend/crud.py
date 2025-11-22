@@ -158,37 +158,58 @@ def generate_audit_csv(db: Session):
 # --- Funções Auxiliares Mantidas e Adaptadas ---
 
 def get_sector_ranking(db: Session, sector_id: int):
-    # Lógica adaptada para a tabela de associação
-    # Busca todos os usuários que pertencem ao setor
-    sector = db.query(models.Sector).filter(models.Sector.sector_id == sector_id).first()
-    if not sector: return []
-    
-    ranking = []
-    for user in sector.members:
-        if user.status == models.UserStatus.ACTIVE:
-            # Reutiliza a lógica de cálculo de pontos, mas filtrando só pra esse setor
-            # (Simplificação: Para performance real, isso deveria ser uma query SQL pura, 
-            # mas para MVP, o loop funciona)
-            checkin_points = db.query(func.sum(models.Activity.points_value))\
-                .join(models.CheckIn)\
-                .filter(models.CheckIn.user_id == user.user_id, models.Activity.sector_id == sector_id)\
-                .scalar() or 0
-            
-            code_points = db.query(func.sum(models.RedeemCode.points_value))\
-                .join(models.GeneralCodeRedemption, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
-                .filter(models.GeneralCodeRedemption.user_id == user.user_id, models.RedeemCode.sector_id == sector_id)\
-                .scalar() or 0
-            
-            unique_points = db.query(func.sum(models.RedeemCode.points_value))\
-                .filter(models.RedeemCode.assigned_user_id == user.user_id, models.RedeemCode.sector_id == sector_id, models.RedeemCode.is_redeemed == True)\
-                .scalar() or 0
-            
-            total = checkin_points + code_points + unique_points
-            ranking.append({"user_id": user.user_id, "username": user.username, "total_points": total})
-    
-    # Ordena
-    ranking.sort(key=lambda x: x['total_points'], reverse=True)
-    return ranking
+    """
+    Calcula o ranking para um setor específico (Lógica N para N).
+    """
+
+    # 1. Pontos de Check-in (Presença)
+    checkin_points_sq = db.query(
+        models.CheckIn.user_id,
+        func.sum(models.Activity.points_value).label("total_checkin_points")
+    ).join(models.Activity, models.CheckIn.activity_id == models.Activity.activity_id)\
+     .group_by(models.CheckIn.user_id)\
+     .subquery()
+
+    # 2. Pontos de Códigos 'Unique'
+    unique_code_points_sq = db.query(
+        models.RedeemCode.assigned_user_id.label("user_id"),
+        func.sum(models.RedeemCode.points_value).label("total_unique_points")
+    ).filter(
+        models.RedeemCode.type == models.CodeType.unique,
+        models.RedeemCode.is_redeemed == True
+    ).group_by(models.RedeemCode.assigned_user_id)\
+     .subquery()
+
+    # 3. Pontos de Códigos 'General'
+    general_code_points_sq = db.query(
+        models.GeneralCodeRedemption.user_id,
+        func.sum(models.RedeemCode.points_value).label("total_general_points")
+    ).join(models.RedeemCode, models.GeneralCodeRedemption.code_id == models.RedeemCode.code_id)\
+     .group_by(models.GeneralCodeRedemption.user_id)\
+     .subquery()
+
+    # 4. Soma Total
+    total_points_col = (
+        func.coalesce(checkin_points_sq.c.total_checkin_points, 0) +
+        func.coalesce(unique_code_points_sq.c.total_unique_points, 0) +
+        func.coalesce(general_code_points_sq.c.total_general_points, 0)
+    ).label("total_points")
+
+    # 5. Query Principal (CORRIGIDA PARA MULTI-SETOR)
+    ranking_query = db.query(
+        models.User.user_id,
+        models.User.username,
+        total_points_col 
+    )\
+    .join(models.user_sectors, models.User.user_id == models.user_sectors.c.user_id) \
+    .filter(models.user_sectors.c.sector_id == sector_id) \
+    .outerjoin(checkin_points_sq, models.User.user_id == checkin_points_sq.c.user_id)\
+    .outerjoin(unique_code_points_sq, models.User.user_id == unique_code_points_sq.c.user_id)\
+    .outerjoin(general_code_points_sq, models.User.user_id == general_code_points_sq.c.user_id)\
+    .filter(models.User.status == models.UserStatus.ACTIVE)\
+    .order_by(total_points_col.desc())
+        
+    return ranking_query.all()
 
 def get_geral_ranking(db: Session):
     # Ranking Global (Soma de tudo)

@@ -4,33 +4,35 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.4.0 <4.0.0'
+  sdk: '>=3.2.0 <4.0.0' # Relaxei a exigência mínima para garantir compatibilidade
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.2
-  http: ^1.2.1
-  shared_preferences: ^2.2.3
-  provider: ^6.1.2
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
   jwt_decoder: ^2.0.1
-  mobile_scanner: ^6.0.11  # Versão compatível com o Render
+  
+  # VERSÕES BLINDADAS (Compatíveis com Flutter 3.22 / Dart 3.4):
+  mobile_scanner: 5.2.3     # Versão extremamente estável
+  url_launcher: 6.2.6       # Versão garantida para este SDK
   qr_flutter: ^4.1.0
-  intl: ^0.20.2
-  clipboard: ^2.0.2
-  curved_navigation_bar: ^1.0.6 # Nova barra de navegação
-  url_launcher: ^6.3.2
+  intl: ^0.19.0             # Versão estável padrão
+  clipboard: ^2.0.1
+  curved_navigation_bar: ^1.0.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^4.0.0    # Versão compatível com o Render
+  # Downgrade para evitar conflito de SDK 3.5+
+  flutter_lints: ^3.0.0    
 
 flutter:
   uses-material-design: true
 
-  # Configuração da Imagem
   assets:
-    - assets/images/logob10.png
+    - assets/images/logoB10.png

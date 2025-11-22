@@ -119,15 +119,18 @@ class _ScanPageState extends State<ScanPage> {
           // Botão de Lanterna
           IconButton(
             icon: ValueListenableBuilder(
-              valueListenable: controller,
+              valueListenable: controller, // <--- MUDANÇA: Escuta o controller direto
               builder: (context, state, child) {
+                // O estado da lanterna agora está dentro de 'state.torchState'
                 switch (state.torchState) {
                   case TorchState.off:
                     return const Icon(Icons.flash_off, color: Colors.grey);
                   case TorchState.on:
                     return const Icon(Icons.flash_on, color: AppColors.primaryYellow);
-                  default:
-                    return const Icon(Icons.flash_off, color: Colors.grey);
+                  case TorchState.auto:
+                    return const Icon(Icons.flash_auto, color: Colors.white);
+                  case TorchState.unavailable:
+                    return const Icon(Icons.no_flash, color: Colors.grey);
                 }
               },
             ),
