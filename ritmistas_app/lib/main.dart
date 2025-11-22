@@ -328,21 +328,20 @@ class _LoginPageState extends State<LoginPage> {
                         ]
                       ),
                       child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/logob10.png', // <--- SUA LOGO AQUI
+                        child: Image.network( // <--- Mudamos para network
+                          'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
                           height: 120,
                           width: 120,
                           fit: BoxFit.cover,
-                            // Ícone de fallback se a imagem ainda não existir (log para debug)
-                            errorBuilder: (context, error, stackTrace) {
-                              debugPrint('Failed to load main logo: $error');
-                              return Container(
-                                height: 120,
-                                width: 120,
-                                color: Colors.black,
-                                child: const Icon(Icons.music_note, size: 50, color: AppColors.primaryYellow),
-                              );
-                            },
+                          // Se der erro ou demorar, mostra um ícone
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow));
+                          },
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            height: 120, width: 120, color: Colors.grey[900],
+                            child: const Icon(Icons.music_note, color: AppColors.primaryYellow, size: 50),
+                          ),
                         ),
                       ),
                     ),

@@ -86,8 +86,8 @@ Widget _buildAppBarTitle(String title) {
     mainAxisSize: MainAxisSize.min,
     children: [
       ClipOval(
-        child: Image.asset(
-          'assets/images/logob10.png', // Certifique-se que é .png ou .jpg conforme seu projeto
+        child: Image.network( // <--- Mudamos para network
+          'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
           height: 30,
           width: 30,
           fit: BoxFit.cover,
