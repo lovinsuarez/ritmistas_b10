@@ -1,25 +1,46 @@
 # backend/schemas.py
 import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
+# --- Schemas de Insígnias ---
+class BadgeBase(BaseModel):
+    name: str
+    description: str | None = None
+    icon_url: str | None = None
+
+class BadgeCreate(BadgeBase):
+    pass
+
+class Badge(BadgeBase):
+    badge_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class UserBadge(BaseModel):
+    badge: Badge
+    awarded_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# --- Schemas de Usuário ---
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-class TokenData(BaseModel):
-    email: str | None = None
-
 class UserBase(BaseModel):
     email: EmailStr
     username: str
+    nickname: str | None = None # NOVO
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 
-# NOVO: Schema para mostrar pontos por setor
+class UserUpdateProfile(BaseModel): # NOVO: Para editar perfil
+    nickname: str | None = None
+    birth_date: date | None = None
+    profile_pic: str | None = None # URL ou Base64
+
 class UserSectorPoints(BaseModel):
     sector_id: int
     sector_name: str
@@ -29,12 +50,18 @@ class User(UserBase):
     user_id: int
     role: UserRole 
     status: UserStatus
-    # Agora retorna uma lista de setores onde o usuário tem pontos
+    birth_date: date | None = None # NOVO
+    profile_pic: str | None = None # NOVO
+    points_budget: int = 0 # NOVO (Para líderes)
+    
+    # Dados calculados
     points_by_sector: list[UserSectorPoints] | None = None
     total_global_points: int | None = None
+    badges: list[UserBadge] = [] # NOVO
 
     model_config = ConfigDict(from_attributes=True) 
 
+# --- Outros Schemas ---
 class Sector(BaseModel):
     sector_id: int
     name: str
@@ -45,17 +72,30 @@ class Sector(BaseModel):
 class RedeemCodeRequest(BaseModel):
     code_string: str
 
-class JoinSectorRequest(BaseModel): # NOVO: Para entrar em outro setor
+class JoinSectorRequest(BaseModel):
     invite_code: str
+
+# NOVO: Para o líder distribuir pontos do orçamento
+class DistributePointsRequest(BaseModel):
+    user_id: int
+    points: int
+    description: str # Ex: "Bom desempenho"
+
+# NOVO: Para o Admin dar orçamento ao líder
+class AddBudgetRequest(BaseModel):
+    lider_id: int
+    points: int
 
 class CodeCreateGeneral(BaseModel):
     code_string: str
     points_value: int = 10
+    is_general: bool = False # NOVO
 
 class CodeCreateUnique(BaseModel):
     code_string: str
     points_value: int = 10
     assigned_user_id: int
+    is_general: bool = False # NOVO
 
 class CheckInRequest(BaseModel):
     activity_id: int
@@ -63,10 +103,13 @@ class CheckInRequest(BaseModel):
 class RankingEntry(BaseModel):
     user_id: int
     username: str
+    nickname: str | None = None # NOVO
+    profile_pic: str | None = None # NOVO
     total_points: int
     model_config = ConfigDict(from_attributes=True)
 
 class RankingResponse(BaseModel):
+    my_user_id: int
     ranking: list[RankingEntry]
 
 class UserRegister(UserCreate): 
@@ -84,11 +127,12 @@ class ActivityCreate(BaseModel):
     address: str | None = None 
     activity_date: datetime 
     points_value: int = Field(..., gt=0) 
+    is_general: bool = False # NOVO
 
 class Activity(ActivityCreate): 
     activity_id: int
     created_by: int
-    sector_id: int
+    sector_id: int | None
     model_config = ConfigDict(from_attributes=True)
 
 class UserAdminView(UserBase): 
@@ -101,12 +145,14 @@ class CheckInDetail(BaseModel):
     title: str
     points: int
     date: datetime
+    is_general: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class CodeDetail(BaseModel):
     code_string: str
     points: int
     date: datetime
+    is_general: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class UserDashboard(BaseModel):
@@ -122,9 +168,10 @@ class UserResponse(User):
 
 class AuditLogItem(BaseModel):
     timestamp: datetime
-    type: str # "CHECK-IN", "CÓDIGO GERAL", "CÓDIGO ÚNICO"
+    type: str 
     user_name: str
     lider_name: str
     sector_name: str
     description: str
     points: int
+    is_general: bool # NOVO

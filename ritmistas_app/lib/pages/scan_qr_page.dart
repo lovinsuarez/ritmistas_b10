@@ -1,8 +1,8 @@
 // lib/pages/scan_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart'; // Pacote da câmera
-import 'package:ritmistas_app/main.dart'; // Para usar AppColors
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,7 +16,7 @@ class ScanPage extends StatefulWidget {
 class _ScanPageState extends State<ScanPage> {
   final ApiService _apiService = ApiService();
   final MobileScannerController controller = MobileScannerController();
-  bool _isProcessing = false; // Trava para não ler o mesmo código 10x seguidas
+  bool _isProcessing = false;
 
   @override
   void dispose() {
@@ -24,27 +24,26 @@ class _ScanPageState extends State<ScanPage> {
     super.dispose();
   }
 
-  // Função chamada quando a câmera detecta algo
+  // Função chamada quando detecta o código
   void _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing) return; // Se já está processando, ignora
+    if (_isProcessing) return;
 
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       if (barcode.rawValue != null) {
         setState(() {
-          _isProcessing = true; // Trava a leitura
+          _isProcessing = true;
         });
 
         final String code = barcode.rawValue!;
         await _processCheckIn(code);
-        break; // Processa apenas o primeiro código encontrado
+        break;
       }
     }
   }
 
   Future<void> _processCheckIn(String activityId) async {
     try {
-      // 1. Mostra Dialog de Carregamento
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -53,18 +52,14 @@ class _ScanPageState extends State<ScanPage> {
         ),
       );
 
-      // 2. Pega o Token
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       if (token == null) throw Exception("Não autenticado.");
 
-      // 3. Chama a API
       final message = await _apiService.checkIn(activityId, token);
 
       if (mounted) {
-        Navigator.pop(context); // Fecha o Loading
-
-        // 4. Mostra Sucesso
+        Navigator.pop(context); // Fecha loading
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -74,8 +69,8 @@ class _ScanPageState extends State<ScanPage> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(ctx); // Fecha o Alerta
-                  Navigator.pop(context); // Fecha a Câmera e volta pra Home
+                  Navigator.pop(ctx); // Fecha alerta
+                  Navigator.pop(context); // Sai da câmera
                 },
                 child: const Text("OK"),
               )
@@ -85,24 +80,15 @@ class _ScanPageState extends State<ScanPage> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Fecha o Loading
-
-        // 5. Mostra Erro
+        Navigator.pop(context); // Fecha loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
-
-        // Destrava para tentar ler de novo após 2 segundos
         await Future.delayed(const Duration(seconds: 2));
-        if (mounted) {
-          setState(() {
-            _isProcessing = false;
-          });
-        }
+        if (mounted) setState(() => _isProcessing = false);
       }
     }
   }
@@ -116,21 +102,16 @@ class _ScanPageState extends State<ScanPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Botão de Lanterna
+          // BOTÃO DE LANTERNA (Sintaxe compatível com v5.2.3)
           IconButton(
             icon: ValueListenableBuilder(
-              valueListenable: controller, // <--- MUDANÇA: Escuta o controller direto
+              valueListenable: controller.torchState, // <--- Isso DEVE funcionar na v5.2.3
               builder: (context, state, child) {
-                // O estado da lanterna agora está dentro de 'state.torchState'
-                switch (state.torchState) {
+                switch (state) {
                   case TorchState.off:
                     return const Icon(Icons.flash_off, color: Colors.grey);
                   case TorchState.on:
                     return const Icon(Icons.flash_on, color: AppColors.primaryYellow);
-                  case TorchState.auto:
-                    return const Icon(Icons.flash_auto, color: Colors.white);
-                  case TorchState.unavailable:
-                    return const Icon(Icons.no_flash, color: Colors.grey);
                 }
               },
             ),
@@ -140,17 +121,14 @@ class _ScanPageState extends State<ScanPage> {
       ),
       body: Stack(
         children: [
-          // A Câmera
           MobileScanner(
             controller: controller,
             onDetect: _onDetect,
           ),
-          
-          // Overlay Escuro com buraco no meio (Visual)
           ColorFiltered(
             colorFilter: ColorFilter.mode(
-              Colors.black.withOpacity(0.5), 
-              BlendMode.srcOut
+              Colors.black.withOpacity(0.5),
+              BlendMode.srcOut,
             ),
             child: Stack(
               children: [
@@ -173,8 +151,6 @@ class _ScanPageState extends State<ScanPage> {
               ],
             ),
           ),
-
-          // Borda Amarela no Centro
           Center(
             child: Container(
               height: 250,
@@ -182,23 +158,6 @@ class _ScanPageState extends State<ScanPage> {
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.primaryYellow, width: 3),
                 borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-
-          // Texto de Instrução
-          const Positioned(
-            bottom: 80,
-            left: 0,
-            right: 0,
-            child: Text(
-              "Aponte a câmera para o código",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
               ),
             ),
           ),

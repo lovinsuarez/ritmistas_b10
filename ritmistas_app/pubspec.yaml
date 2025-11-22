@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0' # Relaxei a exigência mínima para garantir compatibilidade
+  sdk: '>=3.2.0 <4.0.0' # Relaxamos a exigência mínima
 
 dependencies:
   flutter:
@@ -16,11 +16,11 @@ dependencies:
   provider: ^6.1.1
   jwt_decoder: ^2.0.1
   
-  # VERSÕES BLINDADAS (Compatíveis com Flutter 3.22 / Dart 3.4):
-  mobile_scanner: 5.2.3     # Versão extremamente estável
+  # VERSÕES CLÁSSICAS (Compatíveis com Flutter 3.22 e Dart 3.4):
+  mobile_scanner: 5.2.3     # Versão 5.x é extremamente estável
   url_launcher: 6.2.6       # Versão garantida para este SDK
   qr_flutter: ^4.1.0
-  intl: ^0.19.0             # Versão estável padrão
+  intl: ^0.19.0             
   clipboard: ^2.0.1
   curved_navigation_bar: ^1.0.6
 
@@ -28,7 +28,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Downgrade para evitar conflito de SDK 3.5+
+  # Downgrade para evitar conflito com Dart 3.5+
   flutter_lints: ^3.0.0    
 
 flutter:

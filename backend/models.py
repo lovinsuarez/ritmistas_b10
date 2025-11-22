@@ -1,4 +1,5 @@
 # backend/models.py
+
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint, UUID, Table
@@ -26,15 +27,38 @@ class CodeType(enum.Enum):
     general = "general"
     unique = "unique"
 
-# --- TABELA DE ASSOCIAÇÃO (Muitos para Muitos) ---
-# Tabela "invisível" que liga usuários a setores
+# --- TABELA DE ASSOCIAÇÃO (Muitos para Muitos: Usuários <-> Setores) ---
 user_sectors = Table(
     'user_sectors', Base.metadata,
     Column('user_id', Integer, ForeignKey('users.user_id')),
     Column('sector_id', Integer, ForeignKey('sectors.sector_id'))
 )
 
-# --- MODELOS ---
+# --- NOVAS TABELAS PARA INSÍGNIAS (BADGES) ---
+class Badge(Base):
+    __tablename__ = "badges"
+    
+    badge_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False) # Ex: "MVP do Evento"
+    description = Column(String(200)) # Ex: "Melhor performance no ensaio"
+    icon_url = Column(String(255)) # URL da imagem ou nome do ícone
+    created_at = Column(DateTime, server_default=func.now())
+
+    # Relacionamento com quem ganhou
+    awards = relationship("UserBadge", back_populates="badge")
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    badge_id = Column(Integer, ForeignKey("badges.badge_id"), nullable=False)
+    awarded_at = Column(DateTime, server_default=func.now())
+    
+    user = relationship("User", back_populates="badges")
+    badge = relationship("Badge", back_populates="awards")
+
+# --- MODELOS PRINCIPAIS ---
 
 class Sector(Base):
     __tablename__ = "sectors"
@@ -43,14 +67,10 @@ class Sector(Base):
     name = Column(String(100), nullable=False)
     invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
     
-    # Líder do setor (Um setor tem 1 líder principal por enquanto para gestão)
     lider_id = Column(Integer, ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), nullable=True)
     
     lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
-    
-    # RELAÇÃO MUDADA: Um setor tem vários usuários (através da tabela de associação)
     members = relationship("User", secondary=user_sectors, back_populates="sectors")
-    
     activities = relationship("Activity", back_populates="sector")
     redeem_codes = relationship("RedeemCode", back_populates="sector")
 
@@ -59,17 +79,21 @@ class User(Base):
     
     user_id = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
-    username = Column(String(50), nullable=False)
+    username = Column(String(50), nullable=False) # Nome Real
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
     
-    # REMOVIDO: sector_id = Column(...) -> Não existe mais setor único!
+    # --- NOVOS CAMPOS DE PERFIL ---
+    nickname = Column(String(50), nullable=True) # Apelido
+    birth_date = Column(DateTime, nullable=True) # Para calcular idade
+    profile_pic = Column(String(500), nullable=True) # URL da foto
     
-    # RELAÇÃO MUDADA: Um usuário pode estar em vários setores
+    # --- NOVO CAMPO DE ORÇAMENTO (Para Líderes) ---
+    # Quantos pontos o líder tem no bolso para distribuir
+    points_budget = Column(Integer, default=0) 
+    
     sectors = relationship("Sector", secondary=user_sectors, back_populates="members")
-    
-    # Se for líder, qual setor ele lidera?
     led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
 
     checkins = relationship("CheckIn", back_populates="user")
@@ -77,6 +101,9 @@ class User(Base):
     created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
     assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
+    
+    # Relacionamento com Insígnias
+    badges = relationship("UserBadge", back_populates="user")
 
 class Activity(Base):
     __tablename__ = "activities"
@@ -88,9 +115,12 @@ class Activity(Base):
     address = Column(String(255), nullable=True) 
     activity_date = Column(DateTime, nullable=False)
     points_value = Column(Integer, nullable=False, default=10) 
-    created_at = Column(DateTime, server_default=func.now()) # NOVO: Data de criação para auditoria
+    created_at = Column(DateTime, server_default=func.now())
     
-    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
+    # NOVO: Define se essa atividade conta para o Ranking GERAL (True) ou SETOR (False)
+    is_general = Column(Boolean, default=False) 
+
+    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True) # Pode ser nulo se for evento GERAL do Admin
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     
     sector = relationship("Sector", back_populates="activities")
@@ -118,9 +148,12 @@ class RedeemCode(Base):
     points_value = Column(Integer, nullable=False, default=10)
     type = Column(Enum(CodeType), nullable=False)
     is_redeemed = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now()) # NOVO: Auditoria
+    created_at = Column(DateTime, server_default=func.now())
     
-    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=False)
+    # NOVO: Define se conta para o Ranking GERAL
+    is_general = Column(Boolean, default=False) 
+
+    sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True) # Pode ser nulo se for GERAL
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) 
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 # IMPORTANTE: Cole aqui a URL de conexão do seu NOVO banco de dados do Render
-DATABASE_URL = "postgresql://ritmistas_db_ebd7_user:psLQsxkAFkdGBsOuotacCWjFmxYMj6Cx@dpg-d4gddfi4d50c73cuf1e0-a/ritmistas_db_ebd7" 
+DATABASE_URL = "postgresql://ritmistas_db_i51m_user:azPnGzAVPSzM7bSc9O1lRtPypVrJY03H@dpg-d4h1epumcj7s73boa78g-a/ritmistas_db_i51m" 
 
 # Configuração do motor (Engine) do SQLAlchemy
 engine = create_engine(DATABASE_URL)
