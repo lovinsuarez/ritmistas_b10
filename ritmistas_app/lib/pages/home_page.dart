@@ -15,7 +15,7 @@ import 'package:ritmistas_app/main.dart' show LoginPage;
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
-// IMPORTANTE: Nova página de relatórios
+import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart'; 
 
 class HomePage extends StatefulWidget {
@@ -87,7 +87,7 @@ Widget _buildAppBarTitle(String title) {
     children: [
       ClipOval(
         child: Image.asset(
-          'assets/images/logoB10.png', // Certifique-se que é .png ou .jpg conforme seu projeto
+          'assets/images/logob10.png', // Certifique-se que é .png ou .jpg conforme seu projeto
           height: 30,
           width: 30,
           fit: BoxFit.cover,
@@ -234,10 +234,11 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
 
   // LISTA ATUALIZADA COM A NOVA PÁGINA DE RELATÓRIOS
   static final List<Widget> _widgetOptions = <Widget>[
-    const PerfilPage(),
     const AdminMasterSetoresPage(),
     const AdminMasterLideresPage(),
-    const AdminMasterRelatoriosPage(), // <--- NOVA ABA AQUI
+    const AdminMasterRankingPage(), // <--- NOVA ABA DE RANKING (Índice 2)
+    const AdminMasterRelatoriosPage(), // <--- Auditoria (Índice 3)
+    const PerfilPage(), // (Índice 4)
   ];
 
   @override
@@ -257,10 +258,11 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
           Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
           Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
-          Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios/Auditoria (NOVO)
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking (NOVO)
+          Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
