@@ -202,3 +202,13 @@ def download_audit(db: Session = Depends(get_db), a: models.User = Depends(secur
     response = StreamingResponse(io.StringIO(csv_content), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=auditoria_b10.csv"
     return response
+
+@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
+def create_admin_code(
+    d: schemas.CodeCreateGeneral, 
+    db: Session = Depends(get_db), 
+    a: models.User = Depends(security.get_current_admin_master)
+):
+    # Admin cria código com is_general=True automaticamente
+    d.is_general = True 
+    return crud.create_general_code(db, d, a)

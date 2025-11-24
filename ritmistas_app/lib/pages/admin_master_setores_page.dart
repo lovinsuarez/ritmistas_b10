@@ -31,23 +31,34 @@ class _AdminMasterSetoresPageState extends State<AdminMasterSetoresPage>
   }
 
   // ALTERADO: Esta função agora busca setores E líderes
+   // Em lib/pages/admin_master_setores_page.dart
+
   Future<Map<String, dynamic>> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('access_token');
     if (_token == null) {
       throw Exception("Admin Master não autenticado.");
     }
+    
+    try {
+      // Busca setores primeiro (essencial)
+      final sectors = await _apiService.getAllSectors(_token!);
+      
+      // Tenta buscar líderes, mas se falhar, retorna lista vazia para não travar
+      List<UserAdminView> liders = [];
+      try {
+        liders = await _apiService.getAllLiders(_token!);
+      } catch (e) {
+        print("Erro ao carregar líderes (ignorado para não travar): $e");
+      }
 
-    // Roda as duas chamadas de API em paralelo
-    final results = await Future.wait([
-      _apiService.getAllSectors(_token!),
-      _apiService.getAllLiders(_token!),
-    ]);
-
-    return {
-      'sectors': results[0] as List<Sector>,
-      'liders': results[1] as List<UserAdminView>,
-    };
+      return {
+        'sectors': sectors,
+        'liders': liders,
+      };
+    } catch (e) {
+      rethrow; // Se falhar setor, aí sim é erro
+    }
   }
 
   Future<void> _refreshData() async {

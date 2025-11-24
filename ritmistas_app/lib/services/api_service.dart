@@ -166,9 +166,16 @@ class ApiService {
 
   // --- ADMIN MASTER ---
   Future<Sector> createSector(String token, String sectorName) async {
-    final response = await http.post(Uri.parse('$_baseUrl/admin-master/sectors'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"sector_name": sectorName}));
-    if (response.statusCode == 200) return Sector.fromJson(jsonDecode(response.body));
-    throw Exception('Erro criar setor');
+    final url = Uri.parse('$_baseUrl/admin-master/sectors');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+      // AQUI A MUDANÇA: O backend espera "name", não "sector_name"
+      body: jsonEncode({"name": sectorName}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) return Sector.fromJson(data);
+    throw Exception(data['detail'] ?? 'Falha ao criar setor');
   }
 
   Future<List<Sector>> getAllSectors(String token) async {
