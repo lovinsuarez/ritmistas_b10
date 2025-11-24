@@ -1,9 +1,10 @@
 // lib/pages/admin_usuarios_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/pages/admin_criar_codigo_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
+import 'package:ritmistas_app/models/app_models.dart'; // Importa os modelos separados
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminUsuariosPage extends StatefulWidget {
@@ -41,34 +42,84 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erro: ${message.replaceAll("Exception: ", "")}'),
-        backgroundColor: Colors.red,
+      SnackBar(content: Text('Erro: ${message.replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
+    );
+  }
+
+  // --- NOVO: Função para Distribuir Pontos (Orçamento) ---
+  void _handleDistributePoints(UserAdminView user) {
+    final pointsCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text("Premiar ${user.username}", style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Estes pontos saem do seu ORÇAMENTO e contam para o Ranking GERAL.",
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pointsCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: "Pontos (ex: 50)", prefixIcon: Icon(Icons.star, color: AppColors.primaryYellow)),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: descCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: "Motivo (ex: Bom desempenho)", prefixIcon: Icon(Icons.edit)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              if (pointsCtrl.text.isEmpty || descCtrl.text.isEmpty) return;
+              Navigator.pop(ctx);
+              
+              try {
+                await _apiService.distributePoints(
+                  _token!, 
+                  user.userId, 
+                  int.parse(pointsCtrl.text), 
+                  descCtrl.text
+                );
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Enviado ${pointsCtrl.text} pts para ${user.username}!"), backgroundColor: Colors.green)
+                  );
+                }
+              } catch (e) {
+                _showError(e.toString());
+              }
+            },
+            child: const Text("Enviar Pontos"),
+          ),
+        ],
       ),
     );
   }
 
   void _handleDelete(UserAdminView user) async {
     if (_token == null) return;
-
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         title: const Text('Confirmar Exclusão', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Tem certeza que deseja EXCLUIR ${user.username}? Todos os seus dados (check-ins, pontos) serão perdidos.',
-          style: const TextStyle(color: Colors.white70),
-        ),
+        content: Text('Excluir ${user.username}?', style: const TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('EXCLUIR', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -77,11 +128,6 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
       try {
         await _apiService.deleteUser(_token!, user.userId);
         _refreshUsers();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Usuário removido."), backgroundColor: Colors.green),
-          );
-        }
       } catch (e) {
         _showError(e.toString());
       }
@@ -91,51 +137,33 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Fundo transparente para ver o fundo do app principal
       backgroundColor: Colors.transparent, 
       body: FutureBuilder<List<UserAdminView>>(
         future: _usersFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           if (snapshot.hasError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _refreshUsers,
-                    child: const Text('Tentar Novamente'),
-                  ),
+                  Text('Erro: ${snapshot.error}', style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
+                  ElevatedButton(onPressed: _refreshUsers, child: const Text('Tentar Novamente')),
                 ],
               ),
             );
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          final users = snapshot.data ?? [];
+          if (users.isEmpty) {
             return RefreshIndicator(
               onRefresh: _refreshUsers,
-              child: ListView(
-                children: const [
-                  SizedBox(height: 100),
-                  Center(child: Text('Nenhum usuário encontrado.', style: TextStyle(color: Colors.grey))),
-                ],
-              ),
+              child: ListView(children: const [SizedBox(height: 100), Center(child: Text('Nenhum usuário encontrado.', style: TextStyle(color: Colors.grey)))]),
             );
           }
-
-          final users = snapshot.data!;
 
           return RefreshIndicator(
             onRefresh: _refreshUsers,
             child: ListView.builder(
-              // Adicionei padding embaixo para a lista não ficar escondida atrás da barra
               padding: const EdgeInsets.fromLTRB(0, 10, 0, 80), 
               itemCount: users.length,
               itemBuilder: (context, index) {
@@ -147,54 +175,48 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
                   color: AppColors.cardBackground,
                   elevation: 2,
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: isLider 
-                        ? const BorderSide(color: AppColors.primaryYellow, width: 1) 
-                        : BorderSide.none,
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: isLider ? AppColors.primaryYellow : Colors.grey[800],
-                      child: Icon(
-                        isLider ? Icons.security : Icons.person,
-                        color: isLider ? Colors.black : Colors.white,
-                      ),
-                    ),
-                    title: Text(
-                      user.username,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: isLider ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Text(
-                      user.email,
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                    ),
-                    trailing: isUser ? PopupMenuButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.white),
-                      color: AppColors.cardBackground,
-                      itemBuilder: (context) {
-                        return <PopupMenuEntry<String>>[
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, color: Colors.red, size: 20),
-                                SizedBox(width: 8),
-                                Text('Excluir Usuário', style: TextStyle(color: Colors.red)),
-                              ],
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: isLider ? const BorderSide(color: AppColors.primaryYellow, width: 1) : BorderSide.none),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isLider ? AppColors.primaryYellow : Colors.grey[800],
+                            child: Icon(isLider ? Icons.security : Icons.person, color: isLider ? Colors.black : Colors.white),
+                          ),
+                          title: Text(user.username, style: TextStyle(color: Colors.white, fontWeight: isLider ? FontWeight.bold : FontWeight.normal)),
+                          subtitle: Text(user.email, style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                          // Menu de exclusão (apenas para usuários)
+                          trailing: isUser ? PopupMenuButton(
+                            icon: const Icon(Icons.more_vert, color: Colors.white),
+                            color: AppColors.cardBackground,
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, color: Colors.red, size: 20), SizedBox(width: 8), Text('Excluir', style: TextStyle(color: Colors.red))])),
+                            ],
+                            onSelected: (v) { if (v == 'delete') _handleDelete(user); },
+                          ) : null,
+                        ),
+                        
+                        // --- NOVO: Botão de Premiar (Só aparece se for usuário comum) ---
+                        if (isUser) 
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.emoji_events, size: 18),
+                                label: const Text("PREMIAR (PONTO GERAL)"),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryYellow,
+                                  side: const BorderSide(color: AppColors.primaryYellow, width: 1),
+                                ),
+                                onPressed: () => _handleDistributePoints(user),
+                              ),
                             ),
                           ),
-                        ];
-                      },
-                      onSelected: (value) {
-                        if (value == 'delete') _handleDelete(user);
-                      },
-                    ) : null,
+                      ],
+                    ),
                   ),
                 );
               },
@@ -202,19 +224,11 @@ class _AdminUsuariosPageState extends State<AdminUsuariosPage> {
           );
         },
       ),
-
-      // --- AQUI ESTÁ A MUDANÇA DO BOTÃO ---
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80.0), // Levanta o botão 80px
+        padding: const EdgeInsets.only(bottom: 80.0),
         child: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const AdminCriarCodigoPage(),
-              ),
-            );
-          },
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminCriarCodigoPage())),
           label: const Text('Criar Código'),
           icon: const Icon(Icons.qr_code_2),
           backgroundColor: AppColors.primaryYellow,

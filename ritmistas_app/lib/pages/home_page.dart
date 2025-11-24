@@ -15,9 +15,10 @@ import 'package:ritmistas_app/main.dart' show LoginPage;
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
-import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart'; 
-// IMPORTANTE: Importa a página de ranking do admin master que criamos
-import 'package:ritmistas_app/pages/admin_master_ranking_page.dart'; 
+import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart';
+import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
+// NOVO: Importa a página de insígnias
+import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -81,14 +82,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- WIDGET DA BARRA SUPERIOR COM LOGO ONLINE ---
 Widget _buildAppBarTitle(String title) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       ClipOval(
         child: Image.network(
-          'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
+          'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logoB10.png',
           height: 30,
           width: 30,
           fit: BoxFit.cover,
@@ -237,8 +237,9 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
     const PerfilPage(),
     const AdminMasterSetoresPage(),
     const AdminMasterLideresPage(),
-    const AdminMasterRankingPage(), // Página de ranking do Master
-    const AdminMasterRelatoriosPage(), // Relatórios
+    const AdminMasterRankingPage(),
+    const AdminMasterBadgesPage(), // <--- NOVA PÁGINA (Índice 4)
+    const AdminMasterRelatoriosPage(), // (Índice 5)
   ];
 
   @override
@@ -258,11 +259,12 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.apartment, size: 30, color: Colors.black),
-          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ícone Ranking
-          Icon(Icons.assessment, size: 30, color: Colors.black),
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
+          Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
+          Icon(Icons.military_tech, size: 30, color: Colors.black), // Insígnias (NOVO)
+          Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

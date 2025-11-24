@@ -1,132 +1,25 @@
-// lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-// --- MODELOS ---
-class Badge {
-  final int badgeId;
-  final String name;
-  final String? description;
-  final String? iconUrl;
-  Badge({required this.badgeId, required this.name, this.description, this.iconUrl});
-  factory Badge.fromJson(Map<String, dynamic> json) {
-    return Badge(
-      badgeId: json['badge_id'],
-      name: json['name'],
-      description: json['description'],
-      iconUrl: json['icon_url'],
-    );
-  }
-}
+// 1. Importa os modelos para o ApiService usar
+import 'package:ritmistas_app/models/app_models.dart';
 
-class UserBadge {
-  final Badge badge;
-  final DateTime awardedAt;
-  UserBadge({required this.badge, required this.awardedAt});
-  factory UserBadge.fromJson(Map<String, dynamic> json) {
-    return UserBadge(
-      badge: Badge.fromJson(json['badge']),
-      awardedAt: DateTime.parse(json['awarded_at']),
-    );
-  }
-}
+// 2. A MÁGICA: Exporta os modelos para QUEM importar o ApiService
+// Isso faz com que todas as suas páginas voltem a funcionar instantaneamente!
+export 'package:ritmistas_app/models/app_models.dart';
 
-class UserSectorPoints {
-  final int sectorId;
-  final String sectorName;
-  final int points;
-  UserSectorPoints({required this.sectorId, required this.sectorName, required this.points});
-  factory UserSectorPoints.fromJson(Map<String, dynamic> json) {
-    return UserSectorPoints(
-      sectorId: json['sector_id'],
-      sectorName: json['sector_name'],
-      points: json['points'],
-    );
-  }
-}
-
-class Activity {
-  final int activityId;
-  final String title;
-  final DateTime activityDate;
-  final int pointsValue;
-  final String type;
-  final String? address;
-  final bool isGeneral;
-  Activity({required this.activityId, required this.title, required this.activityDate, required this.pointsValue, required this.type, this.address, required this.isGeneral});
-  factory Activity.fromJson(Map<String, dynamic> json) {
-    return Activity(
-      activityId: json['activity_id'],
-      title: json['title'],
-      activityDate: DateTime.parse(json['activity_date']),
-      pointsValue: json['points_value'],
-      type: json['type'],
-      address: json['address'],
-      isGeneral: json['is_general'] ?? false,
-    );
-  }
-}
-
-class UserAdminView {
-  final int userId;
-  final String username;
-  final String email;
-  final String role;
-  final String status;
-  UserAdminView({required this.userId, required this.username, required this.email, required this.role, required this.status});
-  factory UserAdminView.fromJson(Map<String, dynamic> json) {
-    return UserAdminView(
-      userId: json['user_id'],
-      username: json['username'],
-      email: json['email'],
-      role: json['role'],
-      status: json['status'],
-    );
-  }
-}
-
-class UserDashboard {
-  final int userId;
-  final String username;
-  final int totalPoints;
-  final List<dynamic> checkins;
-  final List<dynamic> redeemedCodes;
-  UserDashboard({required this.userId, required this.username, required this.totalPoints, required this.checkins, required this.redeemedCodes});
-  factory UserDashboard.fromJson(Map<String, dynamic> json) {
-    return UserDashboard(
-      userId: json['user_id'],
-      username: json['username'],
-      totalPoints: json['total_points'],
-      checkins: json['checkins'] ?? [],
-      redeemedCodes: json['redeemed_codes'] ?? [],
-    );
-  }
-}
-
-class Sector {
-  final int sectorId;
-  final String name;
-  final String inviteCode;
-  final int? liderId;
-  Sector({required this.sectorId, required this.name, required this.inviteCode, this.liderId});
-  factory Sector.fromJson(Map<String, dynamic> json) {
-    return Sector(
-      sectorId: json['sector_id'],
-      name: json['name'],
-      inviteCode: json['invite_code'],
-      liderId: json['lider_id'],
-    );
-  }
-}
-
-// --- SERVICE ---
 class ApiService {
   static const String _baseUrl = "https://ritmistas-api.onrender.com";
 
+  // --- AUTH ---
   Future<String> login(String email, String password) async {
     final url = Uri.parse('$_baseUrl/auth/token');
-    final response = await http.post(url, headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: {"username": email, "password": password});
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: {"username": email, "password": password},
+    );
     if (response.statusCode == 200) return jsonDecode(response.body)['access_token'];
     throw Exception(jsonDecode(response.body)['detail'] ?? 'Erro login');
   }
@@ -143,10 +36,22 @@ class ApiService {
     if (response.statusCode != 201) throw Exception('Erro registrar user');
   }
 
+  // --- USER ---
   Future<Map<String, dynamic>> getUsersMe(String token) async {
     final response = await http.get(Uri.parse('$_baseUrl/users/me'), headers: {"Authorization": "Bearer $token"});
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Erro buscar dados');
+  }
+
+  Future<void> updateProfile(String token, {String? nickname, String? profilePic, DateTime? birthDate}) async {
+    final url = Uri.parse('$_baseUrl/users/me/profile');
+    final Map<String, dynamic> body = {};
+    if (nickname != null) body['nickname'] = nickname;
+    if (profilePic != null) body['profile_pic'] = profilePic;
+    if (birthDate != null) body['birth_date'] = DateFormat('yyyy-MM-dd').format(birthDate);
+
+    final response = await http.put(url, headers: {"Authorization": "Bearer $token", "Content-Type": "application/json"}, body: jsonEncode(body));
+    if (response.statusCode != 200) throw Exception('Erro atualizar perfil');
   }
 
   Future<void> joinSector(String token, String inviteCode) async {
@@ -166,7 +71,7 @@ class ApiService {
     throw Exception('Erro checkin');
   }
 
-  // --- RANKINGS ---
+  // --- RANKING ---
   Future<Map<String, dynamic>> getGeralRanking(String token) async {
     final response = await http.get(Uri.parse('$_baseUrl/ranking/geral'), headers: {"Authorization": "Bearer $token"});
     if (response.statusCode == 200) return jsonDecode(response.body);
@@ -178,15 +83,9 @@ class ApiService {
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Erro ranking setor');
   }
-  
-  Future<Map<String, dynamic>> getRankingForSector(String token, int sectorId) async {
-    return getSpecificSectorRanking(token, sectorId);
-  }
-  
-  // Alias para compatibilidade antiga
-  Future<Map<String, dynamic>> getSectorRanking(String token) async {
-    return getGeralRanking(token); 
-  }
+
+  Future<Map<String, dynamic>> getSectorRanking(String token) async => getGeralRanking(token);
+  Future<Map<String, dynamic>> getRankingForSector(String token, int sectorId) async => getSpecificSectorRanking(token, sectorId);
 
   // --- LIDER ---
   Future<void> createActivity(String token, {required String title, String? description, required String type, String? address, required DateTime activityDate, required int pointsValue}) async {
@@ -196,25 +95,19 @@ class ApiService {
 
   Future<List<Activity>> getActivities(String token) async {
     final response = await http.get(Uri.parse('$_baseUrl/lider/activities'), headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) {
-      return (jsonDecode(response.body) as List).map((json) => Activity.fromJson(json)).toList();
-    }
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => Activity.fromJson(json)).toList();
     throw Exception('Erro buscar atividades');
   }
 
   Future<List<UserAdminView>> getSectorUsers(String token) async {
     final response = await http.get(Uri.parse('$_baseUrl/lider/users'), headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) {
-      return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
-    }
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
     throw Exception('Erro buscar usuarios');
   }
   
   Future<List<UserAdminView>> getPendingUsers(String token) async {
     final response = await http.get(Uri.parse('$_baseUrl/lider/pending-users'), headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) {
-      return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
-    }
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
     throw Exception('Erro buscar pendentes');
   }
 
@@ -232,10 +125,22 @@ class ApiService {
     final response = await http.delete(Uri.parse('$_baseUrl/lider/users/$userId'), headers: {"Authorization": "Bearer $token"});
     if (response.statusCode != 200 && response.statusCode != 204) throw Exception('Erro deletar');
   }
-  
+
+  Future<Map<String, dynamic>> getUserDashboard(String token, int userId) async {
+    final url = Uri.parse('$_baseUrl/lider/users/$userId/dashboard');
+    final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Falha ao buscar dashboard');
+  }
+
   Future<void> distributePoints(String token, int userId, int points, String description) async {
     final response = await http.post(Uri.parse('$_baseUrl/lider/distribute-points'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"user_id": userId, "points": points, "description": description}));
     if (response.statusCode != 200) throw Exception('Erro distribuir');
+  }
+  
+  Future<void> createGeneralCode(String token, {required String codeString, required int pointsValue}) async {
+    final response = await http.post(Uri.parse('$_baseUrl/lider/codes/general'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"code_string": codeString, "points_value": pointsValue}));
+    if (response.statusCode != 201) throw Exception('Falha ao criar código');
   }
 
   Future<void> addBudget(String token, int liderId, int points) async {
@@ -243,23 +148,20 @@ class ApiService {
     if (response.statusCode != 200) throw Exception('Erro add budget');
   }
 
-  // --- FUNÇÃO QUE FALTAVA PARA A PÁGINA DE CRIAR CÓDIGO ---
-  Future<void> createGeneralCode(String token, {required String codeString, required int pointsValue}) async {
-    final url = Uri.parse('$_baseUrl/lider/codes/general');
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
-      body: jsonEncode({"code_string": codeString, "points_value": pointsValue}),
-    );
-    if (response.statusCode != 201) throw Exception('Falha ao criar código');
+  Future<void> createBadge(String token, String name, String description, String iconUrl) async {
+    final response = await http.post(Uri.parse('$_baseUrl/admin-master/badges'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"name": name, "description": description, "icon_url": iconUrl}));
+    if (response.statusCode != 200) throw Exception('Falha ao criar insígnia');
+  }
+  
+  Future<List<Badge>> getAllBadges(String token) async {
+    final response = await http.get(Uri.parse('$_baseUrl/admin-master/badges'), headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => Badge.fromJson(json)).toList();
+    throw Exception('Erro buscar insignias');
   }
 
-  // --- FUNÇÃO QUE FALTAVA PARA O DASHBOARD ---
-  Future<Map<String, dynamic>> getUserDashboard(String token, int userId) async {
-    final url = Uri.parse('$_baseUrl/lider/users/$userId/dashboard');
-    final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception('Falha ao buscar dashboard');
+  Future<void> awardBadge(String token, int userId, int badgeId) async {
+    final response = await http.post(Uri.parse('$_baseUrl/admin-master/award-badge'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"user_id": userId, "badge_id": badgeId}));
+    if (response.statusCode != 200) throw Exception('Falha ao dar insígnia');
   }
 
   // --- ADMIN MASTER ---
@@ -309,11 +211,8 @@ class ApiService {
   }
 
   Future<List<UserAdminView>> getUsersForSector(String token, int sectorId) async {
-     final url = Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/users');
-     final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
-     if (response.statusCode == 200) {
-       return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
-     }
+     final response = await http.get(Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/users'), headers: {"Authorization": "Bearer $token"});
+     if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
      throw Exception('Erro users setor');
   }
 }

@@ -1,16 +1,13 @@
-// lib/pages/perfil_page.dart
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Para copiar para a área de transferência
-import 'package:ritmistas_app/main.dart'; // Importa AppColors
+import 'package:flutter/services.dart';
+import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// IMPORTANTE: Importa a página de detalhes para a navegação funcionar
 import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart';
+import 'package:ritmistas_app/pages/editar_perfil_page.dart';
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
-
   @override
   State<PerfilPage> createState() => _PerfilPageState();
 }
@@ -18,8 +15,6 @@ class PerfilPage extends StatefulWidget {
 class _PerfilPageState extends State<PerfilPage> {
   final ApiService _apiService = ApiService();
   late Future<Map<String, dynamic>> _userDataFuture;
-  
-  // Controlador para o campo de código
   final TextEditingController _codeController = TextEditingController();
   String? _token;
 
@@ -33,7 +28,7 @@ class _PerfilPageState extends State<PerfilPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) throw Exception("Não autenticado.");
-    _token = token; // Guarda o token
+    _token = token;
     return _apiService.getUsersMe(token);
   }
 
@@ -46,7 +41,6 @@ class _PerfilPageState extends State<PerfilPage> {
     }
   }
 
-  // --- FUNÇÃO PARA ENTRAR EM NOVO SETOR ---
   void _showJoinSectorDialog() {
     showDialog(
       context: context,
@@ -57,30 +51,21 @@ class _PerfilPageState extends State<PerfilPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Insira o código de convite fornecido pelo líder do outro setor.",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
+              const Text("Insira o código de convite.", style: TextStyle(color: Colors.white70, fontSize: 14)),
               const SizedBox(height: 16),
               TextField(
                 controller: _codeController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: "Código de Convite",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: "Código", border: OutlineInputBorder()),
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancelar"),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
             ElevatedButton(
               onPressed: () async {
                 if (_codeController.text.isEmpty) return;
-                Navigator.of(context).pop(); // Fecha o diálogo
+                Navigator.pop(context);
                 await _handleJoinSector(_codeController.text);
               },
               child: const Text("Entrar"),
@@ -95,23 +80,13 @@ class _PerfilPageState extends State<PerfilPage> {
     if (_token == null) return;
     try {
       await _apiService.joinSector(_token!, code);
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Você entrou no novo setor!"), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Entrou no setor!"), backgroundColor: Colors.green));
         _codeController.clear();
-        // Recarrega a tela para mostrar o novo setor na lista
-        setState(() {
-          _userDataFuture = _loadUserData();
-        });
+        setState(() { _userDataFuture = _loadUserData(); });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"), backgroundColor: Colors.red));
     }
   }
 
@@ -121,221 +96,175 @@ class _PerfilPageState extends State<PerfilPage> {
       body: FutureBuilder<Map<String, dynamic>>(
         future: _userDataFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Erro: ${snapshot.error.toString().replaceAll("Exception: ", "")}'));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: Text('Nenhum dado encontrado.'));
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError) return Center(child: Text('Erro: ${snapshot.error}'));
+          if (!snapshot.hasData) return const Center(child: Text('Nenhum dado.'));
 
           final data = snapshot.data!;
           final username = data['username'] ?? 'Nome';
           final email = data['email'] ?? 'email@teste.com';
           final role = data['role'] ?? '2';
           final inviteCode = data['invite_code'];
-          
           final int totalPoints = data['total_global_points'] ?? 0;
           final List<dynamic> sectorsPoints = data['points_by_sector'] ?? [];
+          
+          // Dados V3.0
+          final String? nickname = data['nickname'];
+          final String? profilePic = data['profile_pic'];
+          final String? birthDate = data['birth_date'];
+          final List<dynamic> badges = data['badges'] ?? [];
+          final int pointsBudget = data['points_budget'] ?? 0;
+
+          final String displayName = (nickname != null && nickname.isNotEmpty) ? nickname : username;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- 1. Cartão de Perfil ---
+                // --- CARD PERFIL ---
                 Card(
                   color: AppColors.cardBackground,
                   elevation: 4,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundColor: AppColors.primaryYellow,
+                              backgroundImage: (profilePic != null && profilePic.isNotEmpty) ? NetworkImage(profilePic) : null,
+                              child: (profilePic == null || profilePic.isEmpty) ? const Icon(Icons.person, size: 50, color: Colors.black) : null,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(displayName.toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+                            if (nickname != null && nickname.isNotEmpty) Text(username, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                Chip(label: Text(_getRoleName(role), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), backgroundColor: AppColors.primaryYellow),
+                                if (birthDate != null) Chip(label: Text("🎂 $birthDate", style: const TextStyle(color: Colors.white)), backgroundColor: Colors.grey[800]),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(email, style: TextStyle(color: Colors.grey[400])),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        right: 8, top: 8,
+                        child: IconButton(
+                          icon: const Icon(Icons.edit, color: AppColors.primaryYellow),
+                          onPressed: () async {
+                            final bool? updated = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditarPerfilPage(currentNickname: nickname, currentPhotoUrl: profilePic, currentBirthDate: birthDate)));
+                            if (updated == true) setState(() { _userDataFuture = _loadUserData(); });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // --- INSÍGNIAS (BADGES) ---
+                if (badges.isNotEmpty) ...[
+                  const Text("INSÍGNIAS", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 80,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: badges.length,
+                      itemBuilder: (context, index) {
+                        final b = badges[index]['badge'];
+                        return Container(
+                          width: 70, margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber)),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.emoji_events, color: Colors.amber, size: 30),
+                              Text(b['name'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white), maxLines: 2, overflow: TextOverflow.ellipsis)
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // --- ORÇAMENTO (Se for Líder) ---
+                if (role == '1') ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green[900]!.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green)
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: AppColors.primaryYellow,
-                          child: const Icon(Icons.person, size: 48, color: Colors.black),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          username,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Chip(
-                          label: Text(_getRoleName(role), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                          backgroundColor: AppColors.primaryYellow,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(email, style: TextStyle(color: Colors.grey[400])),
+                        const Text("MEU ORÇAMENTO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        Text("$pointsBudget pts", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
-                ),
-                
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                ],
 
-                // --- 2. Pontuação Geral ---
+                // --- PONTUAÇÃO GERAL ---
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryYellow.withOpacity(0.8), AppColors.primaryYellow],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: LinearGradient(colors: [AppColors.primaryYellow.withOpacity(0.8), AppColors.primaryYellow]),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.primaryYellow.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-                    ]
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("PONTUAÇÃO GERAL", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text("Total Acumulado", style: TextStyle(color: Colors.black54, fontSize: 12)),
-                        ],
-                      ),
-                      Text(
-                        "$totalPoints pts",
-                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
-                      ),
+                      const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text("GERAL B10", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                        Text("Pontos Totais", style: TextStyle(color: Colors.black54)),
+                      ]),
+                      Text("$totalPoints pts", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // --- 3. Detalhamento por Setor ---
-                const Text(
-                  "MEUS SETORES",
-                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                ),
+                // --- SETORES ---
+                const Text("MEUS SETORES", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                
-                if (sectorsPoints.isNotEmpty) 
-                  ...sectorsPoints.map((sector) {
-                    return Card(
-                      color: AppColors.cardBackground,
-                      margin: const EdgeInsets.only(bottom: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.pie_chart, color: AppColors.primaryYellow),
-                        ),
-                        title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "${sector['points']} pts",
-                              style: const TextStyle(color: AppColors.primaryYellow, fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
-                          ],
-                        ),
-                        // AQUI: Clica no setor para ver o ranking dele
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SectorRankingDetailPage(
-                                sectorId: sector['sector_id'],
-                                sectorName: sector['sector_name'],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  }).toList()
-                else 
-                  const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Center(child: Text("Você ainda não pontuou em nenhum setor.", style: TextStyle(color: Colors.grey))),
-                  ),
+                if (sectorsPoints.isEmpty) const Center(child: Text("Sem setores.", style: TextStyle(color: Colors.grey)))
+                else ...sectorsPoints.map((sector) {
+                  return Card(
+                    color: AppColors.cardBackground,
+                    child: ListTile(
+                      leading: const Icon(Icons.pie_chart, color: AppColors.primaryYellow),
+                      title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white)),
+                      trailing: Text("${sector['points']} pts", style: const TextStyle(color: AppColors.primaryYellow, fontSize: 16, fontWeight: FontWeight.bold)),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SectorRankingDetailPage(sectorId: sector['sector_id'], sectorName: sector['sector_name']))),
+                    ),
+                  );
+                }).toList(),
 
-                // --- BOTÃO: ENTRAR EM OUTRO SETOR ---
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _showJoinSectorDialog,
                   icon: const Icon(Icons.add_link),
                   label: const Text("Entrar em outro Setor"),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
                 ),
 
-                const SizedBox(height: 24),
-
-                // --- 4. Código de Convite (Apenas Líder/Admin) ---
-                if (inviteCode != null) ...[
-                  Card(
-                    color: AppColors.primaryYellow, // Fundo Amarelo
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "CÓDIGO DE CONVITE DO SETOR",
-                            style: TextStyle(
-                              color: Colors.black54, 
-                              fontSize: 12, 
-                              fontWeight: FontWeight.bold
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  inviteCode,
-                                  style: const TextStyle(
-                                    fontSize: 18, 
-                                    fontWeight: FontWeight.bold, 
-                                    color: Colors.black, // Texto Preto
-                                    letterSpacing: 1
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy, color: Colors.black),
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: inviteCode));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green)
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Envie para novos membros entrarem no setor.",
-                            style: TextStyle(color: Colors.black45, fontSize: 12),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                
-                const SizedBox(height: 80), 
+                const SizedBox(height: 80),
               ],
             ),
           );
