@@ -14,8 +14,12 @@ class UserRole(enum.Enum):
     user = "2"    # Usuário Padrão
 
 class UserStatus(enum.Enum):
-    PENDING = "PENDING"
-    ACTIVE = "ACTIVE"
+    PENDING = "PENDING" # Pendente de aprovação GERAL (Admin Master)
+    ACTIVE = "ACTIVE"   # Ativo no sistema
+
+class SectorStatus(enum.Enum):
+    PENDING = "PENDING" # Pendente de aprovação no SETOR (Líder)
+    ACTIVE = "ACTIVE"   # Membro ativo do setor
 
 class ActivityType(enum.Enum):
     online = "online"
@@ -25,14 +29,74 @@ class CodeType(enum.Enum):
     general = "general"
     unique = "unique"
 
-# --- TABELA DE ASSOCIAÇÃO (Muitos para Muitos) ---
-user_sectors = Table(
-    'user_sectors', Base.metadata,
-    Column('user_id', Integer, ForeignKey('users.user_id')),
-    Column('sector_id', Integer, ForeignKey('sectors.sector_id'))
-)
+# --- TABELA DE ASSOCIAÇÃO (Usuários <-> Setores COM STATUS) ---
+# Agora é uma classe (modelo) para podermos ter colunas extras como 'status'
+class UserSector(Base):
+    __tablename__ = 'user_sectors'
+    user_id = Column(Integer, ForeignKey('users.user_id'), primary_key=True)
+    sector_id = Column(Integer, ForeignKey('sectors.sector_id'), primary_key=True)
+    status = Column(Enum(SectorStatus), default=SectorStatus.PENDING) # Aprovação do Líder
+    joined_at = Column(DateTime, server_default=func.now())
 
-# --- INSÍGNIAS ---
+    user = relationship("User", back_populates="sector_associations")
+    sector = relationship("Sector", back_populates="member_associations")
+
+# --- NOVO: CONVITES DO SISTEMA (Para entrar no APP) ---
+class SystemInvite(Base):
+    __tablename__ = "system_invites"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), unique=True, nullable=False) # Código que o Admin Master gera
+    is_used = Column(Boolean, default=False)
+    created_by = Column(Integer, ForeignKey("users.user_id")) # Admin Master que criou
+    used_by = Column(Integer, ForeignKey("users.user_id"), nullable=True) # Quem usou
+
+# --- MODELOS PRINCIPAIS ---
+class Sector(Base):
+    __tablename__ = "sectors"
+    sector_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4) # Código para entrar no SETOR
+    
+    lider_id = Column(Integer, ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), nullable=True)
+    lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
+    
+    member_associations = relationship("UserSector", back_populates="sector")
+    
+    # Propriedade auxiliar para acessar membros ativos direto (opcional, mas útil)
+    # members = relationship("User", secondary="user_sectors", viewonly=True) 
+
+    activities = relationship("Activity", back_populates="sector")
+    redeem_codes = relationship("RedeemCode", back_populates="sector")
+
+class User(Base):
+    __tablename__ = "users"
+    user_id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    username = Column(String(50), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
+    
+    # Status GERAL no APP (Controlado pelo Admin Master)
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
+    
+    # Perfil
+    nickname = Column(String(50), nullable=True)
+    birth_date = Column(DateTime, nullable=True)
+    profile_pic = Column(String(500), nullable=True)
+    points_budget = Column(Integer, default=0) 
+    
+    # Relacionamentos
+    sector_associations = relationship("UserSector", back_populates="user")
+    
+    led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
+    badges = relationship("UserBadge", back_populates="user")
+    
+    checkins = relationship("CheckIn", back_populates="user")
+    created_activities = relationship("Activity", back_populates="creator")
+    created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
+    assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
+    general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
+
 class Badge(Base):
     __tablename__ = "badges"
     badge_id = Column(Integer, primary_key=True, index=True)
@@ -50,46 +114,6 @@ class UserBadge(Base):
     awarded_at = Column(DateTime, server_default=func.now())
     user = relationship("User", back_populates="badges")
     badge = relationship("Badge", back_populates="awards")
-
-# --- MODELOS PRINCIPAIS ---
-class Sector(Base):
-    __tablename__ = "sectors"
-    sector_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
-    
-    lider_id = Column(Integer, ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), nullable=True)
-    lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
-    
-    members = relationship("User", secondary=user_sectors, back_populates="sectors")
-    activities = relationship("Activity", back_populates="sector")
-    redeem_codes = relationship("RedeemCode", back_populates="sector")
-
-class User(Base):
-    __tablename__ = "users"
-    user_id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    username = Column(String(50), nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
-    
-    # Perfil
-    nickname = Column(String(50), nullable=True)
-    birth_date = Column(DateTime, nullable=True)
-    profile_pic = Column(String(500), nullable=True)
-    points_budget = Column(Integer, default=0) 
-    
-    # Relacionamentos
-    sectors = relationship("Sector", secondary=user_sectors, back_populates="members")
-    led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
-    badges = relationship("UserBadge", back_populates="user")
-    
-    checkins = relationship("CheckIn", back_populates="user")
-    created_activities = relationship("Activity", back_populates="creator")
-    created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
-    assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
-    general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
 
 class Activity(Base):
     __tablename__ = "activities"

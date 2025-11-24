@@ -14,7 +14,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Projeto Ritmistas B10 API v3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# AUTH
+# --- AUTH ---
 @app.post("/auth/register/admin-master", response_model=schemas.User)
 def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db)):
     if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
@@ -35,7 +35,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     token = security.create_access_token(data={"sub": u.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
     return {"access_token": token, "token_type": "bearer"}
 
-# USER
+# --- USER PROFILE & DATA ---
 @app.get("/users/me", response_model=schemas.User)
 def me(db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
     points_data, total_global = crud.get_user_points_breakdown(db, u)
@@ -61,16 +61,26 @@ def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: mod
     if not code: raise HTTPException(404, "Código inválido.")
     return {"detail": crud.redeem_code(db, u, code)}
 
-# RANKING
+# --- RANKINGS (COM FILTROS) ---
 @app.get("/ranking/geral", response_model=schemas.RankingResponse)
 def rank_geral(month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
     return {"ranking": crud.get_geral_ranking(db, month, year), "my_user_id": u.user_id}
 
 @app.get("/ranking/sector/{sector_id}", response_model=schemas.RankingResponse)
-def rank_sector(sector_id: int, month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"my_user_id": u.user_id, "ranking": crud.get_sector_ranking(db, sector_id, month, year)}
+def rank_sector(
+    sector_id: int,
+    month: Optional[int] = Query(None),
+    year: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    u: models.User = Depends(security.get_current_user)
+):
+    # Simplificação: Permite ver ranking se for admin ou membro
+    return {
+        "my_user_id": u.user_id,
+        "ranking": crud.get_sector_ranking(db, sector_id, month, year)
+    }
 
-# LIDER
+# --- LIDER ---
 @app.post("/lider/distribute-points")
 def distribute(req: schemas.DistributePointsRequest, db: Session = Depends(get_db), lider: models.User = Depends(security.get_current_lider)):
     if not lider.led_sector: raise HTTPException(400, "Sem setor.")
@@ -86,6 +96,7 @@ def pending(db: Session = Depends(get_db), l: models.User = Depends(security.get
 @app.put("/lider/approve-user/{user_id}")
 def approve(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
     u = crud.get_user_by_id(db, user_id)
+    if not u: raise HTTPException(404)
     return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
 
 @app.delete("/lider/reject-user/{user_id}")
@@ -121,10 +132,10 @@ def get_user_dash(user_id: int, db: Session = Depends(get_db), l: models.User = 
 
 @app.post("/lider/codes/general", status_code=status.HTTP_201_CREATED)
 def create_gen_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: raise HTTPException(400)
+    if not l.led_sector: raise HTTPException(400, "Sem setor")
     return crud.create_general_code(db, d, l)
 
-# ADMIN MASTER
+# --- ADMIN MASTER ---
 @app.post("/admin-master/budget")
 def add_budget(req: schemas.AddBudgetRequest, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
     l = crud.add_budget_to_lider(db, req.lider_id, req.points)

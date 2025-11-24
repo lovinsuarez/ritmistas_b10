@@ -1,32 +1,33 @@
+# backend/schemas.py
+# ... (imports iguais)
 import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
+# ... (BadgeBase, BadgeCreate, Badge, UserBadge iguais) ...
 class BadgeBase(BaseModel):
     name: str
     description: str | None = None
     icon_url: str | None = None
-
 class BadgeCreate(BadgeBase): pass
-
 class Badge(BadgeBase):
     badge_id: int
     model_config = ConfigDict(from_attributes=True)
-
 class UserBadge(BaseModel):
     badge: Badge
     awarded_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+# ... (Token, TokenData iguais) ...
 class Token(BaseModel):
     access_token: str
     token_type: str
-
 class TokenData(BaseModel):
     email: str | None = None
 
+# --- User ---
 class UserBase(BaseModel):
     email: EmailStr
     username: str
@@ -34,6 +35,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
+
+class UserRegister(UserCreate): 
+    system_invite_code: str # NOVO: Código para entrar no APP
 
 class UserUpdateProfile(BaseModel):
     nickname: str | None = None
@@ -59,6 +63,7 @@ class User(UserBase):
 
     model_config = ConfigDict(from_attributes=True) 
 
+# ... (Sector, RedeemCodeRequest, etc iguais) ...
 class Sector(BaseModel):
     sector_id: int
     name: str
@@ -75,18 +80,15 @@ class DistributePointsRequest(BaseModel):
 class AddBudgetRequest(BaseModel):
     lider_id: int
     points: int
-
 class CodeCreateGeneral(BaseModel):
     code_string: str
     points_value: int = 10
     is_general: bool = False
-
 class CodeCreateUnique(BaseModel):
     code_string: str
     points_value: int = 10
     assigned_user_id: int
     is_general: bool = False
-
 class CheckInRequest(BaseModel): activity_id: int
 
 class RankingEntry(BaseModel):
@@ -96,12 +98,9 @@ class RankingEntry(BaseModel):
     profile_pic: str | None = None
     total_points: int
     model_config = ConfigDict(from_attributes=True)
-
 class RankingResponse(BaseModel):
     my_user_id: int
     ranking: list[RankingEntry]
-
-class UserRegister(UserCreate): invite_code: str 
 
 class SectorInfo(BaseModel):
     name: str
@@ -116,7 +115,6 @@ class ActivityCreate(BaseModel):
     activity_date: datetime 
     points_value: int = Field(..., gt=0) 
     is_general: bool = False
-
 class Activity(ActivityCreate): 
     activity_id: int
     created_by: int
@@ -135,25 +133,21 @@ class CheckInDetail(BaseModel):
     date: datetime
     is_general: bool = False
     model_config = ConfigDict(from_attributes=True)
-
 class CodeDetail(BaseModel):
     code_string: str
     points: int
     date: datetime
     is_general: bool = False
     model_config = ConfigDict(from_attributes=True)
-
 class UserDashboard(BaseModel):
     user_id: int
     username: str
     total_points: int
     checkins: list[CheckInDetail]
     redeemed_codes: list[CodeDetail]
-
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
     model_config = ConfigDict(from_attributes=True)
-
 class AuditLogItem(BaseModel):
     timestamp: datetime
     type: str 
