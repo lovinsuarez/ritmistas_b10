@@ -142,9 +142,18 @@ class CodeDetail {
   final String codeString;
   final int points;
   final DateTime date;
+
   CodeDetail({required this.codeString, required this.points, required this.date});
-  factory CodeDetail.fromJson(Map<String, dynamic> json) => CodeDetail(
-    codeString: json['code_string'], points: json['points'], date: DateTime.parse(json['date']));
+
+  factory CodeDetail.fromJson(Map<String, dynamic> json) {
+    return CodeDetail(
+      codeString: json['code_string'],
+      // O Backend agora manda 'points_value', nós mapeamos para 'points'
+      points: json['points_value'], 
+      // O Backend agora manda 'created_at', nós mapeamos para 'date'
+      date: DateTime.parse(json['created_at']), 
+    );
+  }
 }
 
 class UserDashboard {

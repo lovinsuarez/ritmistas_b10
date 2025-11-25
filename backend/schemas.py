@@ -127,11 +127,12 @@ class CheckInDetail(BaseConfig):
     date: datetime
     is_general: bool = False
 
-class CodeDetail(BaseConfig):
+class CodeDetail(BaseModel):
     code_string: str
-    points: int
-    date: datetime
+    points_value: int # <--- MUDOU DE 'points' PARA 'points_value'
+    created_at: datetime # <--- MUDOU DE 'date' PARA 'created_at'
     is_general: bool = False
+    model_config = ConfigDict(from_attributes=True)
 
 class UserDashboard(BaseConfig):
     user_id: int
