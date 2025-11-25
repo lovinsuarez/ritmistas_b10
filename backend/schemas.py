@@ -5,35 +5,29 @@ from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
-# --- NOVOS SCHEMAS PARA O FLUXO V4.0 ---
+# Configuração Global para tratar Enums como valores simples
+class BaseConfig(BaseModel):
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-class SystemInvite(BaseModel):
-    code: str
-    is_used: bool
-    model_config = ConfigDict(from_attributes=True)
-
-# --------------------------------------
-
-class BadgeBase(BaseModel):
+class BadgeBase(BaseConfig):
     name: str
     description: str | None = None
     icon_url: str | None = None
 class BadgeCreate(BadgeBase): pass
 class Badge(BadgeBase):
     badge_id: int
-    model_config = ConfigDict(from_attributes=True)
-class UserBadge(BaseModel):
+
+class UserBadge(BaseConfig):
     badge: Badge
     awarded_at: datetime
-    model_config = ConfigDict(from_attributes=True)
 
-class Token(BaseModel):
+class Token(BaseConfig):
     access_token: str
     token_type: str
-class TokenData(BaseModel):
+class TokenData(BaseConfig):
     email: str | None = None
 
-class UserBase(BaseModel):
+class UserBase(BaseConfig):
     email: EmailStr
     username: str
     nickname: str | None = None
@@ -41,16 +35,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 
-# ALTERADO: Registro agora pede código do SISTEMA, não do setor
 class UserRegister(UserCreate): 
-    invite_code: str
+    invite_code: str 
 
-class UserUpdateProfile(BaseModel):
+class UserUpdateProfile(BaseConfig):
     nickname: str | None = None
     birth_date: date | None = None
     profile_pic: str | None = None
 
-class UserSectorPoints(BaseModel):
+class UserSectorPoints(BaseConfig):
     sector_id: int
     sector_name: str
     points: int
@@ -67,52 +60,48 @@ class User(UserBase):
     total_global_points: int | None = None
     badges: list[UserBadge] = []
 
-    model_config = ConfigDict(from_attributes=True) 
-
-class Sector(BaseModel):
+class Sector(BaseConfig):
     sector_id: int
     name: str
     invite_code: uuid.UUID
     lider_id: int | None
-    model_config = ConfigDict(from_attributes=True)
 
-class RedeemCodeRequest(BaseModel): code_string: str
-class JoinSectorRequest(BaseModel): invite_code: str
-class DistributePointsRequest(BaseModel):
+class RedeemCodeRequest(BaseConfig): code_string: str
+class JoinSectorRequest(BaseConfig): invite_code: str
+class DistributePointsRequest(BaseConfig):
     user_id: int
     points: int
     description: str
-class AddBudgetRequest(BaseModel):
+class AddBudgetRequest(BaseConfig):
     lider_id: int
     points: int
-class CodeCreateGeneral(BaseModel):
+class CodeCreateGeneral(BaseConfig):
     code_string: str
     points_value: int = 10
     is_general: bool = False
-class CodeCreateUnique(BaseModel):
+class CodeCreateUnique(BaseConfig):
     code_string: str
     points_value: int = 10
     assigned_user_id: int
     is_general: bool = False
-class CheckInRequest(BaseModel): activity_id: int
+class CheckInRequest(BaseConfig): activity_id: int
 
-class RankingEntry(BaseModel):
+class RankingEntry(BaseConfig):
     user_id: int
     username: str
     nickname: str | None = None
     profile_pic: str | None = None
     total_points: int
-    model_config = ConfigDict(from_attributes=True)
-class RankingResponse(BaseModel):
+
+class RankingResponse(BaseConfig):
     my_user_id: int
     ranking: list[RankingEntry]
 
-class SectorInfo(BaseModel):
+class SectorInfo(BaseConfig):
     name: str
     invite_code: uuid.UUID
-    model_config = ConfigDict(from_attributes=True)
 
-class ActivityCreate(BaseModel):
+class ActivityCreate(BaseConfig):
     title: str = Field(..., max_length=150)
     description: str | None = None
     type: models.ActivityType 
@@ -120,40 +109,41 @@ class ActivityCreate(BaseModel):
     activity_date: datetime 
     points_value: int = Field(..., gt=0) 
     is_general: bool = False
+
 class Activity(ActivityCreate): 
     activity_id: int
     created_by: int
     sector_id: int | None
-    model_config = ConfigDict(from_attributes=True)
 
+# --- AQUI É ONDE PROVAVELMENTE ESTAVA O ERRO ---
 class UserAdminView(UserBase): 
     user_id: int
-    role: models.UserRole
-    status: models.UserStatus
-    model_config = ConfigDict(from_attributes=True)
+    role: UserRole
+    status: UserStatus
 
-class CheckInDetail(BaseModel):
+class CheckInDetail(BaseConfig):
     title: str
     points: int
     date: datetime
     is_general: bool = False
-    model_config = ConfigDict(from_attributes=True)
-class CodeDetail(BaseModel):
+
+class CodeDetail(BaseConfig):
     code_string: str
     points: int
     date: datetime
     is_general: bool = False
-    model_config = ConfigDict(from_attributes=True)
-class UserDashboard(BaseModel):
+
+class UserDashboard(BaseConfig):
     user_id: int
     username: str
     total_points: int
     checkins: list[CheckInDetail]
     redeemed_codes: list[CodeDetail]
+
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
-    model_config = ConfigDict(from_attributes=True)
-class AuditLogItem(BaseModel):
+
+class AuditLogItem(BaseConfig):
     timestamp: datetime
     type: str 
     user_name: str
@@ -162,3 +152,7 @@ class AuditLogItem(BaseModel):
     description: str
     points: int
     is_general: bool
+    
+class SystemInvite(BaseConfig):
+    code: str
+    is_used: bool
