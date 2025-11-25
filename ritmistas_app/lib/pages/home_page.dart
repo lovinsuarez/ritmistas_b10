@@ -1,25 +1,30 @@
-// lib/pages/home_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:ritmistas_app/main.dart' hide LoginPage; // Esconde para não conflitar
+import 'package:ritmistas_app/pages/login_page.dart'; // Importa a página de Login explicitamente
+
+// IMPORTS DAS PÁGINAS
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
-import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_usuarios_page.dart';
 import 'package:ritmistas_app/pages/perfil_page.dart';
 import 'package:ritmistas_app/pages/ranking_page.dart';
 import 'package:ritmistas_app/pages/resgate_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/main.dart' show LoginPage;
+
+// IMPORTS ADMIN MASTER
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
 import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart';
 import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
-import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
+import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
+import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
+
+// IMPORT SCANNER
+import 'package:ritmistas_app/pages/scan_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,16 +47,18 @@ class _HomePageState extends State<HomePage> {
     return prefs.getString('user_role');
   }
 
+  // --- CORREÇÃO DEFINITIVA DO CRASH AO SAIR ---
   Future<void> _handleLogout() async {
+    // 1. Captura o Navigator IMEDIATAMENTE (antes de qualquer await)
+    // Isso garante que temos a referência para mudar a tela, mesmo se o widget for desmontado.
+    // rootNavigator: true garante que pegamos o controlador principal do App.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('user_role');
+    await prefs.clear(); // Limpa token e role
 
-    if (context.mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-    }
+    // 2. Usa a referência segura para navegar para o Login
+    navigator.pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   @override
@@ -64,6 +71,7 @@ class _HomePageState extends State<HomePage> {
         }
 
         if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          // Se der erro, força o logout seguro
           WidgetsBinding.instance.addPostFrameCallback((_) => _handleLogout());
           return const Scaffold(body: Center(child: Text("Erro de autenticação.")));
         }
@@ -153,9 +161,11 @@ class _UserScaffoldState extends State<UserScaffold> {
         animationCurve: Curves.easeInOut,
         animationDuration: const Duration(milliseconds: 300),
         onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+          if (index == 1) {
+             Navigator.push(context, MaterialPageRoute(builder: (context) => const ScanPage()));
+          } else {
+             setState(() => _selectedIndex = index);
+          }
         },
       ),
     );
@@ -192,6 +202,7 @@ class _LiderScaffoldState extends State<LiderScaffold> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          // O botão chama a função segura _handleLogout que passamos
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
@@ -235,13 +246,14 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
   int _selectedIndex = 0;
 
   static final List<Widget> _widgetOptions = <Widget>[
-    const AdminMasterSetoresPage(), // 0
-    const AdminMasterLideresPage(), // 1
-    const AdminMasterPontosPage(), // <--- 2. NOVA PÁGINA (Pontos Gerais)
-    const AdminMasterRankingPage(), // 3
-    const AdminMasterRelatoriosPage(), // 4
-    const PerfilPage(), // 5
-    const AdminMasterConvitesPage(), // 6
+    const PerfilPage(),
+    const AdminMasterSetoresPage(),
+    const AdminMasterLideresPage(),
+    const AdminMasterPontosPage(), 
+    const AdminMasterRankingPage(), 
+    const AdminMasterBadgesPage(),
+    const AdminMasterConvitesPage(),
+    const AdminMasterRelatoriosPage(),
   ];
 
   @override
@@ -261,13 +273,14 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
           Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
           Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
-          Icon(Icons.stars, size: 30, color: Colors.black), // <--- PONTOS GERAIS
+          Icon(Icons.stars, size: 30, color: Colors.black), // Pontos
           Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
+          Icon(Icons.military_tech, size: 30, color: Colors.black), // Insígnias
+          Icon(Icons.vpn_key, size: 30, color: Colors.black), // Convites
           Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
-          Icon( Icons.vpn_key, size: 30, color: Colors.black), // Convites
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

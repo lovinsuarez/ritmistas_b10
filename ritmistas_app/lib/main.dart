@@ -1,10 +1,9 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+// ADICIONE ESTA LINHA:
+import 'package:ritmistas_app/pages/login_page.dart';
 // --- 1. DEFINIÇÃO DE CORES E TEMA ---
 
 class AppColors {
@@ -76,7 +75,13 @@ class MyApp extends StatelessWidget {
       title: 'Ritmistas B10',
       theme: appTheme,
       debugShowCheckedModeBanner: false,
-      home: const LoginPage(),
+      // ROTA INICIAL
+      initialRoute: '/login',
+      // DEFINIÇÃO DAS ROTAS
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/home': (context) => const HomePage(),
+      },
     );
   }
 }
