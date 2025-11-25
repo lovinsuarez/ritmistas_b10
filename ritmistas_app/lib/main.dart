@@ -47,7 +47,7 @@ final ThemeData appTheme = ThemeData(
   
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
-    fillColor: AppColors.cardBackground,
+    fillColor: const Color(0xFF2C2C2C),
     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
@@ -59,7 +59,7 @@ final ThemeData appTheme = ThemeData(
     ),
     hintStyle: const TextStyle(color: Colors.grey),
     prefixIconColor: Colors.grey,
-    labelStyle: const TextStyle(color: Colors.grey),
+    labelStyle: const TextStyle(color: Colors.white70),
   ),
 );
 

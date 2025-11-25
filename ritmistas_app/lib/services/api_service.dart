@@ -113,8 +113,29 @@ class ApiService {
 
   // --- LIDER ---
   Future<void> createActivity(String token, {required String title, String? description, required String type, String? address, required DateTime activityDate, required int pointsValue}) async {
-    final response = await http.post(Uri.parse('$_baseUrl/lider/activities'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"title": title, "description": description, "type": type, "address": address, "activity_date": activityDate.toIso8601String(), "points_value": pointsValue}));
-    if (response.statusCode != 201) throw Exception('Erro criar atividade');
+    final url = Uri.parse('$_baseUrl/lider/activities');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+      body: jsonEncode({
+        "title": title, 
+        "description": description, 
+        "type": type, 
+        "address": address,
+        "activity_date": activityDate.toIso8601String(), 
+        "points_value": pointsValue
+      }),
+    );
+    
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      // AQUI ESTÁ A MELHORIA: Tenta ler a mensagem do servidor
+      try {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['detail'] ?? 'Falha ao criar atividade');
+      } catch (e) {
+        throw Exception('Erro ${response.statusCode}: Falha ao criar atividade');
+      }
+    }
   }
 
   Future<List<Activity>> getActivities(String token) async {

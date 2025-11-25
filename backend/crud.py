@@ -334,3 +334,19 @@ def get_liders(db: Session):
 def get_all_users(db: Session):
     """Retorna todos os usuários com a função 'user'."""
     return db.query(models.User).filter(models.User.role == models.UserRole.user).all()
+
+def get_activities_by_sector(db: Session, sector_id: int):
+    """
+    Busca atividades do setor OU criadas pelo líder dono do setor.
+    """
+    # Primeiro descobrimos quem é o líder desse setor
+    sector = get_sector_by_id(db, sector_id)
+    lider_id = sector.lider_id if sector else None
+
+    return db.query(models.Activity)\
+             .filter(
+                 (models.Activity.sector_id == sector_id) | 
+                 (models.Activity.created_by == lider_id)
+             )\
+             .order_by(models.Activity.activity_date.desc())\
+             .all()
