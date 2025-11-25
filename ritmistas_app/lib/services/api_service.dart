@@ -318,15 +318,15 @@ class ApiService {
   }
 
   Future<List<CodeDetail>> getAdminGeneralCodes(String token) async {
-      final url = Uri.parse('${ApiService._baseUrl}/admin-master/codes/general');
-      final response = await http.get(
-        url,
-        headers: {"Authorization": "Bearer $token"},
-      );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => CodeDetail.fromJson(json)).toList();
-      }
-      throw Exception('Falha ao buscar códigos');
+    final url = Uri.parse('${ApiService._baseUrl}/admin-master/codes/general');
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => CodeDetail.fromJson(json)).toList();
     }
+    throw Exception('Falha ao buscar códigos');
+  }
 }

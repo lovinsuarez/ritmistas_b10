@@ -238,11 +238,3 @@ def create_admin_general_code(
     d.is_general = True
     return crud.create_general_code(db, d, a)
 
-# 2. Listar Códigos Gerais (Admin) - ESTE É O QUE ESTÁ FALTANDO PARA A LISTA
-@app.get("/admin-master/codes/general", response_model=List[schemas.CodeDetail])
-def get_admin_codes(
-    db: Session = Depends(get_db), 
-    a: models.User = Depends(security.get_current_admin_master)
-):
-    return crud.get_general_codes(db)
-
