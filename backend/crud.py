@@ -133,28 +133,49 @@ def assign_lider_to_sector(db: Session, lider_id: int, sector_id: int):
         return sector
     return None
 
+def generate_short_code(length=6):
+    chars = string.ascii_uppercase + string.digits
+    return "".join(random.choice(chars) for _ in range(length))
+
 def create_activity(db: Session, activity_data: schemas.ActivityCreate, creator: models.User):
     is_general = (creator.role == models.UserRole.admin) or activity_data.is_general
     sector_id = creator.led_sector.sector_id if creator.led_sector else None
+    
+    # Gera código único
+    code = generate_short_code()
+    
     new_activity = models.Activity(
-        title=activity_data.title, description=activity_data.description, type=activity_data.type,
-        address=activity_data.address, activity_date=activity_data.activity_date,
-        points_value=activity_data.points_value, sector_id=sector_id, created_by=creator.user_id,
-        is_general=is_general
+        title=activity_data.title,
+        description=activity_data.description,
+        type=activity_data.type,
+        address=activity_data.address,
+        activity_date=activity_data.activity_date,
+        points_value=activity_data.points_value,
+        sector_id=sector_id, 
+        created_by=creator.user_id,
+        is_general=is_general,
+        checkin_code=code # Salva o código
     )
     db.add(new_activity)
     db.commit()
     db.refresh(new_activity)
     return new_activity
 
-def create_checkin(db: Session, user: models.User, activity_id: int):
-    activity = db.query(models.Activity).filter(models.Activity.activity_id == activity_id).first()
-    if not activity: return "Atividade não encontrada."
+# ALTERADO: Agora busca pelo CÓDIGO, não pelo ID
+def create_checkin(db: Session, user: models.User, activity_code: str): # Mudou de activity_id (int) para code (str)
+    # Busca atividade pelo código gerado
+    activity = db.query(models.Activity).filter(models.Activity.checkin_code == activity_code).first()
+    
+    if not activity:
+        return "Código de atividade inválido."
+    
     if not activity.is_general and activity.sector not in user.sectors:
         return "Você não pertence ao setor desta atividade."
-    existing = db.query(models.CheckIn).filter(models.CheckIn.user_id==user.user_id, models.CheckIn.activity_id==activity_id).first()
+
+    existing = db.query(models.CheckIn).filter(models.CheckIn.user_id==user.user_id, models.CheckIn.activity_id==activity.activity_id).first()
     if existing: return "Check-in já realizado."
-    new_checkin = models.CheckIn(user_id=user.user_id, activity_id=activity_id)
+
+    new_checkin = models.CheckIn(user_id=user.user_id, activity_id=activity.activity_id)
     db.add(new_checkin)
     db.commit()
     return f"Check-in realizado! +{activity.points_value} pts"

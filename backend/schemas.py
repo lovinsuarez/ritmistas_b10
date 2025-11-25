@@ -84,7 +84,8 @@ class CodeCreateUnique(BaseConfig):
     points_value: int = 10
     assigned_user_id: int
     is_general: bool = False
-class CheckInRequest(BaseConfig): activity_id: int
+class CheckInRequest(BaseModel): 
+    activity_code: str # Mudou de activity_id (int)
 
 class RankingEntry(BaseConfig):
     user_id: int
@@ -114,6 +115,8 @@ class Activity(ActivityCreate):
     activity_id: int
     created_by: int
     sector_id: int | None
+    checkin_code: str | None = None # NOVO
+    model_config = ConfigDict(from_attributes=True)
 
 # --- AQUI É ONDE PROVAVELMENTE ESTAVA O ERRO ---
 class UserAdminView(UserBase): 

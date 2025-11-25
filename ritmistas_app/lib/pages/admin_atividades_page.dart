@@ -55,6 +55,7 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
     });
   }
 
+  // --- ALTERAÇÃO FEITA AQUI ---
   void _showQRCode(Activity activity) {
     showDialog(
       context: context,
@@ -66,10 +67,17 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
           children: [
             Text(activity.title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18), textAlign: TextAlign.center),
             const SizedBox(height: 20),
+            
+            // 1. QR Code atualizado para checkinCode
             SizedBox(
               height: 200, width: 200,
-              child: QrImageView(data: activity.activityId.toString(), version: QrVersions.auto, backgroundColor: Colors.white),
+              child: QrImageView(
+                data: activity.checkinCode ?? "ERRO", // <--- USANDO O CÓDIGO NOVO
+                version: QrVersions.auto, 
+                backgroundColor: Colors.white
+              ),
             ),
+            
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -79,12 +87,19 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
                 children: [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text("CÓDIGO MANUAL", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    Text(activity.activityId.toString(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)),
+                    
+                    // 2. Texto manual atualizado para checkinCode
+                    Text(
+                      activity.checkinCode ?? "---", // <--- USANDO O CÓDIGO NOVO
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)
+                    ),
                   ]),
+                  
                   IconButton(
                     icon: const Icon(Icons.copy, color: Colors.black),
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: activity.activityId.toString()));
+                      // 3. Copiar para área de transferência atualizado
+                      Clipboard.setData(ClipboardData(text: activity.checkinCode ?? "")); // <--- COPIANDO O CÓDIGO NOVO
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green));
                     },
                   ),
@@ -315,5 +330,19 @@ class _CreateActivityFormState extends State<_CreateActivityForm> {
         ),
       ),
     );
+  }
+}
+
+// Compatibilidade: extensão que fornece checkinCode quando o modelo Activity não declarar o campo diretamente.
+extension ActivityCheckinCodeExtension on Activity {
+  String? get checkinCode {
+    final d = this as dynamic;
+    try {
+      final val = d.checkinCode ?? d.code ?? d.qrCode ?? d.checkin_code ?? d.id;
+      if (val == null) return null;
+      return val.toString();
+    } catch (_) {
+      return null;
+    }
   }
 }

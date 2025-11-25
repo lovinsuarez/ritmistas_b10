@@ -1,12 +1,13 @@
+// lib/services/api_service.dart
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-// 1. Importa os modelos para o ApiService usar
+// 1. Importa os modelos (que estão em app_models.dart)
 import 'package:ritmistas_app/models/app_models.dart';
 
-// 2. A MÁGICA: Exporta os modelos para QUEM importar o ApiService
-// Isso faz com que todas as suas páginas voltem a funcionar instantaneamente!
+// 2. Exporta os modelos para que o resto do app os enxergue
 export 'package:ritmistas_app/models/app_models.dart';
 
 class ApiService {
@@ -39,22 +40,19 @@ class ApiService {
         "email": email, 
         "username": username, 
         "password": password, 
-        "invite_code": inviteCode // O campo chave
+        "invite_code": inviteCode 
       }),
     );
 
     if (response.statusCode != 201) {
-      // Tenta decodificar o erro detalhado
       try {
         final errorData = jsonDecode(response.body);
-        // Se for erro de validação (422), o 'detail' é uma lista/mapa complexo
         if (response.statusCode == 422) {
-            print("Erro 422 Detalhado: ${response.body}"); // Mostra no console
-            throw Exception("Erro de validação: Verifique os dados."); 
+            print("Erro 422: ${response.body}");
+            throw Exception("Verifique os dados enviados."); 
         }
         throw Exception(errorData['detail'] ?? 'Falha ao registrar');
       } catch (e) {
-         // Se não for JSON ou der erro ao ler
          throw Exception("Erro ${response.statusCode}: ${response.body}");
       }
     }
@@ -126,16 +124,8 @@ class ApiService {
         "points_value": pointsValue
       }),
     );
-    
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      // AQUI ESTÁ A MELHORIA: Tenta ler a mensagem do servidor
-      try {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['detail'] ?? 'Falha ao criar atividade');
-      } catch (e) {
-        throw Exception('Erro ${response.statusCode}: Falha ao criar atividade');
-      }
-    }
+    // Aceita 200 ou 201
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Falha ao criar atividade');
   }
 
   Future<List<Activity>> getActivities(String token) async {
@@ -188,6 +178,7 @@ class ApiService {
     if (response.statusCode != 201) throw Exception('Falha ao criar código');
   }
 
+  // --- ADMIN MASTER ---
   Future<void> addBudget(String token, int liderId, int points) async {
     final response = await http.post(Uri.parse('$_baseUrl/admin-master/budget'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"lider_id": liderId, "points": points}));
     if (response.statusCode != 200) throw Exception('Erro add budget');
@@ -209,14 +200,13 @@ class ApiService {
     if (response.statusCode != 200) throw Exception('Falha ao dar insígnia');
   }
 
-  // --- ADMIN MASTER ---
   Future<Sector> createSector(String token, String sectorName) async {
     final url = Uri.parse('$_baseUrl/admin-master/sectors');
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
-      // AQUI A MUDANÇA: O backend espera "name", não "sector_name"
-      body: jsonEncode({"name": sectorName}),
+      // CORREÇÃO: Envia "name" conforme esperado pelo backend
+      body: jsonEncode({"name": sectorName}), 
     );
     final data = jsonDecode(response.body);
     if (response.statusCode == 200) return Sector.fromJson(data);
@@ -265,24 +255,17 @@ class ApiService {
   Future<List<UserAdminView>> getUsersForSector(String token, int sectorId) async {
      final response = await http.get(Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/users'), headers: {"Authorization": "Bearer $token"});
      if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
-     throw Exception('Erro users setor');
+     throw Exception('Erro buscar users setor');
   }
+
   Future<void> createAdminGeneralCode(String token, {required String codeString, required int pointsValue}) async {
-    final url = Uri.parse('$_baseUrl/admin-master/codes/general'); // <--- Tem que bater com o main.py
+    final url = Uri.parse('$_baseUrl/admin-master/codes/general');
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
-      body: jsonEncode({
-        "code_string": codeString, 
-        "points_value": pointsValue,
-        "is_general": true
-      }),
+      body: jsonEncode({"code_string": codeString, "points_value": pointsValue, "is_general": true}),
     );
-    
-    // Aceita 201 (Criado) ou 200 (OK)
-    if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception('Falha ao criar código geral (Erro ${response.statusCode})');
-    }
+    if (response.statusCode != 201 && response.statusCode != 200) throw Exception('Falha ao criar código geral');
   }
 
   Future<String> createSystemInvite(String token) async {
@@ -292,7 +275,6 @@ class ApiService {
     throw Exception('Falha ao gerar convite');
   }
 
-  // Lista convites ativos
   Future<List<dynamic>> getSystemInvites(String token) async {
     final url = Uri.parse('$_baseUrl/admin-master/system-invites');
     final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
@@ -300,17 +282,13 @@ class ApiService {
     throw Exception('Falha ao buscar convites');
   }
 
-  // Lista usuários pendentes de aprovação global
   Future<List<UserAdminView>> getPendingGlobalUsers(String token) async {
     final url = Uri.parse('$_baseUrl/admin-master/pending-global');
     final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) {
-      return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
-    }
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
     throw Exception('Falha ao buscar pendentes globais');
   }
 
-  // Aprova usuário global
   Future<void> approveGlobalUser(String token, int userId) async {
     final url = Uri.parse('$_baseUrl/admin-master/approve-global/$userId');
     final response = await http.put(url, headers: {"Authorization": "Bearer $token"});
@@ -318,15 +296,9 @@ class ApiService {
   }
 
   Future<List<CodeDetail>> getAdminGeneralCodes(String token) async {
-    final url = Uri.parse('${ApiService._baseUrl}/admin-master/codes/general');
-    final response = await http.get(
-      url,
-      headers: {"Authorization": "Bearer $token"},
-    );
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => CodeDetail.fromJson(json)).toList();
-    }
+    final url = Uri.parse('$_baseUrl/admin-master/codes/general');
+    final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => CodeDetail.fromJson(json)).toList();
     throw Exception('Falha ao buscar códigos');
   }
 }

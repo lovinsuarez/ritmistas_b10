@@ -106,6 +106,7 @@ class User(Base):
 
 class Activity(Base):
     __tablename__ = "activities"
+    
     activity_id = Column(Integer, primary_key=True, index=True)
     title = Column(String(150), nullable=False)
     description = Column(String, nullable=True)
@@ -115,6 +116,9 @@ class Activity(Base):
     points_value = Column(Integer, nullable=False, default=10) 
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
+
+    # NOVO CAMPO: Código aleatório para check-in (ex: A1B2C)
+    checkin_code = Column(String(20), unique=True, nullable=True) 
 
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
