@@ -330,3 +330,7 @@ def generate_audit_csv(db: Session):
 def get_liders(db: Session):
     """Retorna todos os usuários com a função 'lider'."""
     return db.query(models.User).filter(models.User.role == models.UserRole.lider).all()
+
+def get_all_users(db: Session):
+    """Retorna todos os usuários com a função 'user'."""
+    return db.query(models.User).filter(models.User.role == models.UserRole.user).all()
