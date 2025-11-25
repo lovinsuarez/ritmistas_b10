@@ -204,3 +204,10 @@ def download_audit(db: Session = Depends(get_db), a: models.User = Depends(secur
     response = StreamingResponse(io.StringIO(csv_content), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=auditoria_b10.csv"
     return response
+
+@app.get("/admin-master/codes/general", response_model=List[schemas.CodeDetail])
+def get_admin_codes(
+    db: Session = Depends(get_db), 
+    a: models.User = Depends(security.get_current_admin_master)
+):
+    return crud.get_general_codes(db)

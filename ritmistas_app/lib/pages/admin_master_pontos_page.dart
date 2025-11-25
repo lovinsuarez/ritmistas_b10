@@ -178,7 +178,7 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.qr_code_Scanner, size: 60, color: Colors.grey),
+                        Icon(Icons.qr_code_scanner, size: 60, color: Colors.grey),
                         SizedBox(height: 10),
                         Text("Nenhum código criado.", style: TextStyle(color: Colors.grey)),
                       ],
