@@ -36,11 +36,19 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     return {"access_token": token, "token_type": "bearer"}
 
 # --- USER PROFILE & DATA ---
-@app.get("/users/me", response_model=schemas.User)
+@app.get("/users/me", response_model=schemas.UserResponse)
 def me(db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
+    # 1. Calcula os pontos (como antes)
     points_data, total_global = crud.get_user_points_breakdown(db, u)
     u.points_by_sector = points_data
     u.total_global_points = total_global
+    
+    # 2. CORREÇÃO: Verifica se é líder e anexa o código
+    if u.led_sector:
+        u.invite_code = u.led_sector.invite_code
+    else:
+        u.invite_code = None
+        
     return u
 
 @app.put("/users/me/profile", response_model=schemas.User)

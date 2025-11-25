@@ -1,6 +1,8 @@
+// lib/pages/perfil_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:flutter/services.dart'; // Para copiar para a área de transferência
+import 'package:ritmistas_app/main.dart'; // Importa AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart';
@@ -8,6 +10,7 @@ import 'package:ritmistas_app/pages/editar_perfil_page.dart';
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
+
   @override
   State<PerfilPage> createState() => _PerfilPageState();
 }
@@ -51,21 +54,21 @@ class _PerfilPageState extends State<PerfilPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Insira o código de convite.", style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const Text("Insira o código de convite fornecido pelo líder.", style: TextStyle(color: Colors.white70, fontSize: 14)),
               const SizedBox(height: 16),
               TextField(
                 controller: _codeController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: "Código", border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: "Código de Convite", border: OutlineInputBorder()),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Cancelar")),
             ElevatedButton(
               onPressed: () async {
                 if (_codeController.text.isEmpty) return;
-                Navigator.pop(context);
+                Navigator.of(context).pop();
                 await _handleJoinSector(_codeController.text);
               },
               child: const Text("Entrar"),
@@ -81,7 +84,7 @@ class _PerfilPageState extends State<PerfilPage> {
     try {
       await _apiService.joinSector(_token!, code);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Entrou no setor!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Você entrou no novo setor!"), backgroundColor: Colors.green));
         _codeController.clear();
         setState(() { _userDataFuture = _loadUserData(); });
       }
@@ -104,7 +107,8 @@ class _PerfilPageState extends State<PerfilPage> {
           final username = data['username'] ?? 'Nome';
           final email = data['email'] ?? 'email@teste.com';
           final role = data['role'] ?? '2';
-          final inviteCode = data['invite_code'];
+          final inviteCode = data['invite_code']; // Código do setor (se for líder)
+          
           final int totalPoints = data['total_global_points'] ?? 0;
           final List<dynamic> sectorsPoints = data['points_by_sector'] ?? [];
           
@@ -122,7 +126,7 @@ class _PerfilPageState extends State<PerfilPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- CARD PERFIL ---
+                // --- 1. Cartão de Perfil ---
                 Card(
                   color: AppColors.cardBackground,
                   elevation: 4,
@@ -264,7 +268,62 @@ class _PerfilPageState extends State<PerfilPage> {
                   label: const Text("Entrar em outro Setor"),
                 ),
 
-                const SizedBox(height: 80),
+                const SizedBox(height: 24),
+
+                // --- CÓDIGO DE CONVITE DO SETOR (AQUI ESTÁ A VOLTA DO BOTÃO) ---
+                if (inviteCode != null) ...[
+                  Card(
+                    color: AppColors.primaryYellow, // Amarelo para destacar
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "CÓDIGO DE CONVITE DO SETOR",
+                            style: TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  inviteCode,
+                                  style: const TextStyle(
+                                    fontSize: 20, 
+                                    fontWeight: FontWeight.bold, 
+                                    color: Colors.black, 
+                                    letterSpacing: 1
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, color: Colors.black),
+                                tooltip: "Copiar Código",
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: inviteCode));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green)
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Envie este código para novos membros.",
+                            style: TextStyle(color: Colors.black45, fontSize: 12),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 80), // Espaço extra para não ficar atrás da barra curva
               ],
             ),
           );

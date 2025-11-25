@@ -142,6 +142,7 @@ class UserDashboard(BaseConfig):
 
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
+    model_config = ConfigDict(from_attributes=True) 
 
 class AuditLogItem(BaseConfig):
     timestamp: datetime
