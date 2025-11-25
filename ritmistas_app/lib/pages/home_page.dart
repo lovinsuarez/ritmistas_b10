@@ -5,6 +5,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
+import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_usuarios_page.dart';
 import 'package:ritmistas_app/pages/perfil_page.dart';
@@ -234,12 +235,12 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
   int _selectedIndex = 0;
 
   static final List<Widget> _widgetOptions = <Widget>[
-    const PerfilPage(),
-    const AdminMasterSetoresPage(),
-    const AdminMasterLideresPage(),
-    const AdminMasterRankingPage(),
-    const AdminMasterBadgesPage(), // <--- NOVA PÁGINA (Índice 4)
-    const AdminMasterRelatoriosPage(), // (Índice 5)
+    const AdminMasterSetoresPage(), // 0
+    const AdminMasterLideresPage(), // 1
+    const AdminMasterPontosPage(), // <--- 2. NOVA PÁGINA (Pontos Gerais)
+    const AdminMasterRankingPage(), // 3
+    const AdminMasterRelatoriosPage(), // 4
+    const PerfilPage(), // 5
   ];
 
   @override
@@ -259,12 +260,12 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
         index: _selectedIndex,
         height: 60.0,
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
           Icon(Icons.apartment, size: 30, color: Colors.black), // Setores
           Icon(Icons.admin_panel_settings, size: 30, color: Colors.black), // Líderes
+          Icon(Icons.stars, size: 30, color: Colors.black), // <--- PONTOS GERAIS
           Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
-          Icon(Icons.military_tech, size: 30, color: Colors.black), // Insígnias (NOVO)
           Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

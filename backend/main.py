@@ -11,7 +11,7 @@ import crud, models, schemas, security
 from database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
-app = FastAPI(title="Projeto Ritmistas B10 API v3")
+app = FastAPI(title="Projeto Ritmistas B10 API v4")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # --- AUTH ---
@@ -24,14 +24,14 @@ def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db)):
 def reg_user(d: schemas.UserRegister, db: Session = Depends(get_db)):
     if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
     u = crud.create_user_from_invite(db, d)
-    if not u: raise HTTPException(400, "Código inválido.")
+    if not u: raise HTTPException(400, "Código de convite inválido.")
     return u
 
 @app.post("/auth/token", response_model=schemas.Token)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     u = crud.get_user_by_email(db, form.username)
     if not u or not security.verify_password(form.password, u.hashed_password): raise HTTPException(401, "Login falhou.")
-    if u.status == models.UserStatus.PENDING: raise HTTPException(403, "Conta pendente.")
+    if u.status == models.UserStatus.PENDING: raise HTTPException(403, "Conta pendente de aprovação do Admin Master.")
     token = security.create_access_token(data={"sub": u.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
     return {"access_token": token, "token_type": "bearer"}
 
@@ -61,24 +61,14 @@ def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: mod
     if not code: raise HTTPException(404, "Código inválido.")
     return {"detail": crud.redeem_code(db, u, code)}
 
-# --- RANKINGS (COM FILTROS) ---
+# --- RANKINGS ---
 @app.get("/ranking/geral", response_model=schemas.RankingResponse)
 def rank_geral(month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
     return {"ranking": crud.get_geral_ranking(db, month, year), "my_user_id": u.user_id}
 
 @app.get("/ranking/sector/{sector_id}", response_model=schemas.RankingResponse)
-def rank_sector(
-    sector_id: int,
-    month: Optional[int] = Query(None),
-    year: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    u: models.User = Depends(security.get_current_user)
-):
-    # Simplificação: Permite ver ranking se for admin ou membro
-    return {
-        "my_user_id": u.user_id,
-        "ranking": crud.get_sector_ranking(db, sector_id, month, year)
-    }
+def rank_sector(sector_id: int, month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
+    return {"my_user_id": u.user_id, "ranking": crud.get_sector_ranking(db, sector_id, month, year)}
 
 # --- LIDER ---
 @app.post("/lider/distribute-points")
@@ -87,23 +77,6 @@ def distribute(req: schemas.DistributePointsRequest, db: Session = Depends(get_d
     success, msg = crud.distribute_points_from_budget(db, lider, req.user_id, req.points, req.description)
     if not success: raise HTTPException(400, msg)
     return {"detail": msg}
-
-@app.get("/lider/pending-users", response_model=List[schemas.UserAdminView])
-def pending(db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: raise HTTPException(400)
-    return crud.get_pending_users_by_sector(db, l.led_sector.sector_id)
-
-@app.put("/lider/approve-user/{user_id}")
-def approve(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    u = crud.get_user_by_id(db, user_id)
-    if not u: raise HTTPException(404)
-    return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
-
-@app.delete("/lider/reject-user/{user_id}")
-def reject(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    u = crud.get_user_by_id(db, user_id)
-    crud.delete_user(db, u)
-    return {"ok": True}
 
 @app.post("/lider/activities")
 def create_act(act: schemas.ActivityCreate, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
@@ -136,6 +109,27 @@ def create_gen_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db),
     return crud.create_general_code(db, d, l)
 
 # --- ADMIN MASTER ---
+@app.post("/admin-master/system-invite")
+def create_sys_invite(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    """Gera um código de convite do sistema (para entrar no app)."""
+    invite = crud.generate_system_invite(db)
+    return {"code": invite.code}
+
+@app.get("/admin-master/system-invites", response_model=List[schemas.SystemInvite])
+def list_sys_invites(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    return crud.get_all_system_invites(db)
+
+@app.get("/admin-master/pending-global", response_model=List[schemas.UserAdminView])
+def get_pending_global(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    """Usuários que se registraram e esperam aprovação para entrar no app."""
+    return crud.get_pending_global_users(db)
+
+@app.put("/admin-master/approve-global/{user_id}")
+def approve_global(user_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    """Aprova usuário para usar o app."""
+    u = crud.get_user_by_id(db, user_id)
+    return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
+
 @app.post("/admin-master/budget")
 def add_budget(req: schemas.AddBudgetRequest, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
     l = crud.add_budget_to_lider(db, req.lider_id, req.points)
@@ -202,13 +196,3 @@ def download_audit(db: Session = Depends(get_db), a: models.User = Depends(secur
     response = StreamingResponse(io.StringIO(csv_content), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=auditoria_b10.csv"
     return response
-
-@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
-def create_admin_code(
-    d: schemas.CodeCreateGeneral, 
-    db: Session = Depends(get_db), 
-    a: models.User = Depends(security.get_current_admin_master)
-):
-    # Admin cria código com is_general=True automaticamente
-    d.is_general = True 
-    return crud.create_general_code(db, d, a)

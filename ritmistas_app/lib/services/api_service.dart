@@ -32,8 +32,32 @@ class ApiService {
 
   Future<void> registerUser({required String email, required String password, required String username, required String inviteCode}) async {
     final url = Uri.parse('$_baseUrl/auth/register/user');
-    final response = await http.post(url, headers: {"Content-Type": "application/json"}, body: jsonEncode({"email": email, "username": username, "password": password, "invite_code": inviteCode}));
-    if (response.statusCode != 201) throw Exception('Erro registrar user');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "email": email, 
+        "username": username, 
+        "password": password, 
+        "invite_code": inviteCode // O campo chave
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      // Tenta decodificar o erro detalhado
+      try {
+        final errorData = jsonDecode(response.body);
+        // Se for erro de validação (422), o 'detail' é uma lista/mapa complexo
+        if (response.statusCode == 422) {
+            print("Erro 422 Detalhado: ${response.body}"); // Mostra no console
+            throw Exception("Erro de validação: Verifique os dados."); 
+        }
+        throw Exception(errorData['detail'] ?? 'Falha ao registrar');
+      } catch (e) {
+         // Se não for JSON ou der erro ao ler
+         throw Exception("Erro ${response.statusCode}: ${response.body}");
+      }
+    }
   }
 
   // --- USER ---
@@ -221,5 +245,18 @@ class ApiService {
      final response = await http.get(Uri.parse('$_baseUrl/admin-master/sectors/$sectorId/users'), headers: {"Authorization": "Bearer $token"});
      if (response.statusCode == 200) return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
      throw Exception('Erro users setor');
+  }
+  Future<void> createAdminGeneralCode(String token, {required String codeString, required int pointsValue}) async {
+    final url = Uri.parse('$_baseUrl/admin-master/codes/general');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+      body: jsonEncode({
+        "code_string": codeString, 
+        "points_value": pointsValue,
+        "is_general": true // Garante que é geral
+      }),
+    );
+    if (response.statusCode != 201) throw Exception('Falha ao criar código geral');
   }
 }

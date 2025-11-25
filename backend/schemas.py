@@ -1,12 +1,19 @@
 # backend/schemas.py
-# ... (imports iguais)
 import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
-# ... (BadgeBase, BadgeCreate, Badge, UserBadge iguais) ...
+# --- NOVOS SCHEMAS PARA O FLUXO V4.0 ---
+
+class SystemInvite(BaseModel):
+    code: str
+    is_used: bool
+    model_config = ConfigDict(from_attributes=True)
+
+# --------------------------------------
+
 class BadgeBase(BaseModel):
     name: str
     description: str | None = None
@@ -20,14 +27,12 @@ class UserBadge(BaseModel):
     awarded_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
-# ... (Token, TokenData iguais) ...
 class Token(BaseModel):
     access_token: str
     token_type: str
 class TokenData(BaseModel):
     email: str | None = None
 
-# --- User ---
 class UserBase(BaseModel):
     email: EmailStr
     username: str
@@ -36,8 +41,9 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 
+# ALTERADO: Registro agora pede código do SISTEMA, não do setor
 class UserRegister(UserCreate): 
-    system_invite_code: str # NOVO: Código para entrar no APP
+    system_invite_code: str 
 
 class UserUpdateProfile(BaseModel):
     nickname: str | None = None
@@ -63,7 +69,6 @@ class User(UserBase):
 
     model_config = ConfigDict(from_attributes=True) 
 
-# ... (Sector, RedeemCodeRequest, etc iguais) ...
 class Sector(BaseModel):
     sector_id: int
     name: str
