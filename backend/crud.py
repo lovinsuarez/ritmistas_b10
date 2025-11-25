@@ -352,8 +352,8 @@ def get_activities_by_sector(db: Session, sector_id: int):
              .all()
 
 def get_general_codes(db: Session):
-    """Retorna todos os códigos gerais criados (para o Admin ver)."""
     return db.query(models.RedeemCode)\
              .filter(models.RedeemCode.is_general == True)\
              .order_by(models.RedeemCode.created_at.desc())\
              .all()
+
