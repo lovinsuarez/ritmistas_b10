@@ -326,3 +326,7 @@ def generate_audit_csv(db: Session):
     for l in logs:
         writer.writerow([l['timestamp'], l['type'], l['user_name'], l['lider_name'], l['sector_name'], l['description'], l['points'], l['is_general']])
     return output.getvalue()
+
+def get_liders(db: Session):
+    """Retorna todos os usuários com a função 'lider'."""
+    return db.query(models.User).filter(models.User.role == models.UserRole.lider).all()
