@@ -26,7 +26,7 @@ def get_all_system_invites(db: Session):
 def validate_system_invite(db: Session, code: str):
     return db.query(models.SystemInvite).filter(models.SystemInvite.code == code, models.SystemInvite.is_used == False).first()
 
-# --- CRIAÇÃO DE USUÁRIOS (ALTERADO) ---
+# --- CRIAÇÃO DE USUÁRIOS (CORRIGIDO) ---
 
 def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     hashed_password = security.get_password_hash(admin_data.password)
@@ -43,12 +43,17 @@ def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     return db_admin
 
 def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
-    # 1. Valida o convite do SISTEMA
-    sector = get_sector_by_invite_code(db, invite_code=user_data.invite_code)
-    if not sector:
-        return None 
+    # AQUI ESTAVA O ERRO:
+    # Antes: Buscava setor.
+    # Agora: Busca o Convite do Sistema.
+    
+    # O campo 'invite_code' vem do frontend
+    invite = validate_system_invite(db, code=user_data.invite_code)
+    
+    if not invite:
+        return None # Código inválido ou já usado
 
-    # 2. Cria usuário PENDENTE e SEM SETOR
+    # Cria usuário PENDENTE e SEM SETOR (ele entra no setor depois)
     hashed_password = security.get_password_hash(user_data.password)
     db_user = models.User(
         email=user_data.email,
@@ -59,8 +64,8 @@ def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
     )
     db.add(db_user)
     
-    # 3. Marca convite como usado (Opcional: Se quiser que o código expire)
-    # invite.is_used = True 
+    # Opcional: Marcar convite como usado
+    # invite.is_used = True
     # db.add(invite)
 
     db.commit()
@@ -72,10 +77,7 @@ def get_pending_global_users(db: Session):
     """Retorna usuários que se cadastraram mas ainda não foram aprovados no APP."""
     return db.query(models.User).filter(models.User.status == models.UserStatus.PENDING).all()
 
-# ... (MANTENHA TODAS AS OUTRAS FUNÇÕES: get_user_by_email, rankings, atividades, etc.
-# Elas não mudam, exceto que 'user.sectors' agora começa vazia para novos usuários).
-
-# (Vou colar o restante das funções essenciais abaixo para garantir que você tenha o arquivo completo)
+# --- RESTO DO ARQUIVO (IGUAL) ---
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
@@ -285,12 +287,9 @@ def get_user_badges(db: Session, user_id: int):
     return user.badges
 
 def get_pending_users_by_sector(db: Session, sector_id: int):
-    # AQUI A LÓGICA MUDA: No setor, é só adicionar membro.
-    # Vamos manter isso para o Líder ver quem entrou recentemente?
-    # Ou remover? Por enquanto, deixamos, mas a aprovação crítica é a GLOBAL.
     sector = get_sector_by_id(db, sector_id)
     if not sector: return []
-    return [] # Lógica de aprovação de setor pode ser simplificada
+    return [] 
 
 def update_user_status(db: Session, user: models.User, status: models.UserStatus):
     user.status = status
