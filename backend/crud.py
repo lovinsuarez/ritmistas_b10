@@ -44,8 +44,8 @@ def create_admin_master(db: Session, admin_data: schemas.UserCreate):
 
 def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
     # 1. Valida o convite do SISTEMA
-    invite = validate_system_invite(db, user_data.system_invite_code)
-    if not invite:
+    sector = get_sector_by_invite_code(db, invite_code=user_data.invite_code)
+    if not sector:
         return None 
 
     # 2. Cria usuário PENDENTE e SEM SETOR

@@ -43,7 +43,7 @@ class UserCreate(UserBase):
 
 # ALTERADO: Registro agora pede código do SISTEMA, não do setor
 class UserRegister(UserCreate): 
-    system_invite_code: str 
+    invite_code: str
 
 class UserUpdateProfile(BaseModel):
     nickname: str | None = None

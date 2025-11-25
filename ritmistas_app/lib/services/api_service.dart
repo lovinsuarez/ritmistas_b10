@@ -259,4 +259,36 @@ class ApiService {
     );
     if (response.statusCode != 201) throw Exception('Falha ao criar código geral');
   }
+
+  Future<String> createSystemInvite(String token) async {
+    final url = Uri.parse('$_baseUrl/admin-master/system-invite');
+    final response = await http.post(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) return jsonDecode(response.body)['code'];
+    throw Exception('Falha ao gerar convite');
+  }
+
+  // Lista convites ativos
+  Future<List<dynamic>> getSystemInvites(String token) async {
+    final url = Uri.parse('$_baseUrl/admin-master/system-invites');
+    final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Falha ao buscar convites');
+  }
+
+  // Lista usuários pendentes de aprovação global
+  Future<List<UserAdminView>> getPendingGlobalUsers(String token) async {
+    final url = Uri.parse('$_baseUrl/admin-master/pending-global');
+    final response = await http.get(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List).map((json) => UserAdminView.fromJson(json)).toList();
+    }
+    throw Exception('Falha ao buscar pendentes globais');
+  }
+
+  // Aprova usuário global
+  Future<void> approveGlobalUser(String token, int userId) async {
+    final url = Uri.parse('$_baseUrl/admin-master/approve-global/$userId');
+    final response = await http.put(url, headers: {"Authorization": "Bearer $token"});
+    if (response.statusCode != 200) throw Exception('Falha ao aprovar usuário');
+  }
 }

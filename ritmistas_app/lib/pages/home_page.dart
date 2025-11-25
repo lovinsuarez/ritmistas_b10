@@ -18,7 +18,7 @@ import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
 import 'package:ritmistas_app/pages/admin_master_relatorios_page.dart';
 import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
-// NOVO: Importa a página de insígnias
+import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
 import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -241,6 +241,7 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
     const AdminMasterRankingPage(), // 3
     const AdminMasterRelatoriosPage(), // 4
     const PerfilPage(), // 5
+    const AdminMasterConvitesPage(), // 6
   ];
 
   @override
@@ -266,6 +267,7 @@ class _AdminMasterScaffoldState extends State<AdminMasterScaffold> {
           Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking
           Icon(Icons.assessment, size: 30, color: Colors.black), // Relatórios
           Icon(Icons.person, size: 30, color: Colors.black), // Perfil
+          Icon( Icons.vpn_key, size: 30, color: Colors.black), // Convites
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,
