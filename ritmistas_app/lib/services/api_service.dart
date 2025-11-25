@@ -268,17 +268,21 @@ class ApiService {
      throw Exception('Erro users setor');
   }
   Future<void> createAdminGeneralCode(String token, {required String codeString, required int pointsValue}) async {
-    final url = Uri.parse('$_baseUrl/admin-master/codes/general');
+    final url = Uri.parse('$_baseUrl/admin-master/codes/general'); // <--- Tem que bater com o main.py
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
       body: jsonEncode({
         "code_string": codeString, 
         "points_value": pointsValue,
-        "is_general": true // Garante que é geral
+        "is_general": true
       }),
     );
-    if (response.statusCode != 201) throw Exception('Falha ao criar código geral');
+    
+    // Aceita 201 (Criado) ou 200 (OK)
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Falha ao criar código geral (Erro ${response.statusCode})');
+    }
   }
 
   Future<String> createSystemInvite(String token) async {

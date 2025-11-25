@@ -211,3 +211,20 @@ def get_admin_codes(
     a: models.User = Depends(security.get_current_admin_master)
 ):
     return crud.get_general_codes(db)
+
+@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
+def create_admin_general_code(
+    d: schemas.CodeCreateGeneral, 
+    db: Session = Depends(get_db), 
+    a: models.User = Depends(security.get_current_admin_master)
+):
+    """
+    [Admin Master] Cria um código de pontuação GERAL (Global).
+    Este código não pertence a nenhum setor específico.
+    """
+    # Força a flag de geral para True
+    d.is_general = True
+    
+    # Reutiliza a função do CRUD. 
+    # Como o Admin não tem 'led_sector', o sector_id ficará Null, o que é correto para códigos globais.
+    return crud.create_general_code(db, d, a)
