@@ -143,7 +143,7 @@ class _UserScaffoldState extends State<UserScaffold> {
         backgroundColor: Colors.transparent,
         elevation: 0,
 
-        
+
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
@@ -184,11 +184,11 @@ class LiderScaffold extends StatefulWidget {
 }
 
 class _LiderScaffoldState extends State<LiderScaffold> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Começa no Perfil
 
   static const List<Widget> _widgetOptions = <Widget>[
     PerfilPage(),
-    AdminCadastroPage(),
+    // REMOVIDO: AdminCadastroPage(),  <-- Não precisamos mais dessa aba
     AdminAtividadesPage(),
     AdminAprovacoesPage(),
     AdminUsuariosPage(),
@@ -204,7 +204,6 @@ class _LiderScaffoldState extends State<LiderScaffold> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // O botão chama a função segura _handleLogout que passamos
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
@@ -212,13 +211,14 @@ class _LiderScaffoldState extends State<LiderScaffold> {
       bottomNavigationBar: CurvedNavigationBar(
         index: _selectedIndex,
         height: 60.0,
+        // REMOVIDO O ÍCONE 'add_circle'
         items: const <Widget>[
-          Icon(Icons.person, size: 30, color: Colors.black),
-          Icon(Icons.add_circle, size: 30, color: Colors.black),
-          Icon(Icons.list_alt, size: 30, color: Colors.black),
-          Icon(Icons.notification_important, size: 30, color: Colors.black),
-          Icon(Icons.group, size: 30, color: Colors.black),
-          Icon(Icons.emoji_events, size: 30, color: Colors.black),
+          Icon(Icons.person, size: 30, color: Colors.black), // Perfil (0)
+          // REMOVIDO: Icon(Icons.add_circle, size: 30, color: Colors.black), // Cadastro
+          Icon(Icons.list_alt, size: 30, color: Colors.black), // Atividades (1)
+          Icon(Icons.notification_important, size: 30, color: Colors.black), // Aprovar (2)
+          Icon(Icons.group, size: 30, color: Colors.black), // Usuários (3)
+          Icon(Icons.emoji_events, size: 30, color: Colors.black), // Ranking (4)
         ],
         color: AppColors.primaryYellow,
         buttonBackgroundColor: AppColors.primaryYellow,

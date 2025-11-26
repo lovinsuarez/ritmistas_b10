@@ -6,7 +6,7 @@
 
 
     <application
-        android:label="ritmistas_app"
+        android:label="B10 Points"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

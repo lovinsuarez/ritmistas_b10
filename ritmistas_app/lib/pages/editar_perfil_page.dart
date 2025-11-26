@@ -1,3 +1,5 @@
+// lib/pages/editar_perfil_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ritmistas_app/main.dart';
@@ -39,6 +41,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     }
   }
 
+  // --- FUNÇÃO DE SELECIONAR DATA ---
   Future<void> _pickDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -107,27 +110,44 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                 child: _photoUrlController.text.isEmpty ? const Icon(Icons.person, size: 50, color: Colors.white) : null,
               ),
               const SizedBox(height: 20),
+              
               TextFormField(
                 controller: _photoUrlController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(labelText: "URL da Foto (Link)", prefixIcon: Icon(Icons.link)),
                 onChanged: (val) => setState(() {}),
               ),
+              
               const SizedBox(height: 16),
+              
               TextFormField(
                 controller: _nicknameController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(labelText: "Apelido", prefixIcon: Icon(Icons.badge)),
               ),
+              
               const SizedBox(height: 16),
+              
+              // --- AQUI ESTAVA O ERRO ---
               InkWell(
-                onTap: _pickDate,
+                // Correção: Usamos () => _pickDate() para evitar erro de tipagem
+                onTap: () => _pickDate(),
                 child: InputDecorator(
-                  decoration: const InputDecoration(labelText: "Data de Nascimento", prefixIcon: Icon(Icons.calendar_today), border: OutlineInputBorder()),
-                  child: Text(_selectedDate == null ? "Selecione" : DateFormat('dd/MM/yyyy').format(_selectedDate!), style: const TextStyle(color: Colors.white)),
+                  decoration: const InputDecoration(
+                    labelText: "Data de Nascimento", 
+                    prefixIcon: Icon(Icons.calendar_today), 
+                    border: OutlineInputBorder()
+                  ),
+                  child: Text(
+                    _selectedDate == null ? "Selecione" : DateFormat('dd/MM/yyyy').format(_selectedDate!), 
+                    style: const TextStyle(color: Colors.white)
+                  ),
                 ),
               ),
+              // --------------------------
+
               const SizedBox(height: 32),
+              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

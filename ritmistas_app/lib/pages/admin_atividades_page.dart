@@ -159,7 +159,7 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 100), // Espaço extra no final da lista
               itemCount: activities.length,
               itemBuilder: (context, index) {
                 final activity = activities[index];
@@ -203,12 +203,18 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateActivityDialog,
-        label: const Text("Nova Atividade"),
-        icon: const Icon(Icons.add),
-        backgroundColor: AppColors.primaryYellow,
-        foregroundColor: Colors.black,
+      
+      // --- CORREÇÃO DO BOTÃO FLUTUANTE ---
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80.0), // Levanta o botão 80px
+        child: FloatingActionButton.extended(
+          onPressed: _showCreateActivityDialog,
+          label: const Text("Nova Atividade"),
+          icon: const Icon(Icons.add),
+          backgroundColor: AppColors.primaryYellow,
+          foregroundColor: Colors.black,
+        ),
       ),
     );
   }
