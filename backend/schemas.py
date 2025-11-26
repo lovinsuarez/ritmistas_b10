@@ -1,13 +1,16 @@
-# backend/schemas.py
 import models
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
-# Configuração Global para tratar Enums como valores simples
+# Configuração Global
 class BaseConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+class SystemInvite(BaseConfig):
+    code: str
+    is_used: bool
 
 class BadgeBase(BaseConfig):
     name: str
@@ -16,7 +19,6 @@ class BadgeBase(BaseConfig):
 class BadgeCreate(BadgeBase): pass
 class Badge(BadgeBase):
     badge_id: int
-
 class UserBadge(BaseConfig):
     badge: Badge
     awarded_at: datetime
@@ -34,7 +36,6 @@ class UserBase(BaseConfig):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
-
 class UserRegister(UserCreate): 
     invite_code: str 
 
@@ -55,7 +56,6 @@ class User(UserBase):
     birth_date: date | None = None
     profile_pic: str | None = None
     points_budget: int = 0
-    
     points_by_sector: list[UserSectorPoints] | None = None
     total_global_points: int | None = None
     badges: list[UserBadge] = []
@@ -75,6 +75,7 @@ class DistributePointsRequest(BaseConfig):
 class AddBudgetRequest(BaseConfig):
     lider_id: int
     points: int
+
 class CodeCreateGeneral(BaseConfig):
     code_string: str
     points_value: int = 10
@@ -84,8 +85,10 @@ class CodeCreateUnique(BaseConfig):
     points_value: int = 10
     assigned_user_id: int
     is_general: bool = False
-class CheckInRequest(BaseModel): 
-    activity_code: str # Mudou de activity_id (int)
+
+# MUDANÇA: Agora o CheckIn recebe um código string, não um ID int
+class CheckInRequest(BaseConfig): 
+    activity_code: str 
 
 class RankingEntry(BaseConfig):
     user_id: int
@@ -115,10 +118,9 @@ class Activity(ActivityCreate):
     activity_id: int
     created_by: int
     sector_id: int | None
-    checkin_code: str | None = None # NOVO
-    model_config = ConfigDict(from_attributes=True)
+    # CAMPO QUE FALTAVA:
+    checkin_code: str | None = None
 
-# --- AQUI É ONDE PROVAVELMENTE ESTAVA O ERRO ---
 class UserAdminView(UserBase): 
     user_id: int
     role: UserRole
@@ -130,12 +132,11 @@ class CheckInDetail(BaseConfig):
     date: datetime
     is_general: bool = False
 
-class CodeDetail(BaseModel):
+class CodeDetail(BaseConfig):
     code_string: str
-    points_value: int # <--- MUDOU DE 'points' PARA 'points_value'
-    created_at: datetime # <--- MUDOU DE 'date' PARA 'created_at'
+    points_value: int
+    created_at: datetime
     is_general: bool = False
-    model_config = ConfigDict(from_attributes=True)
 
 class UserDashboard(BaseConfig):
     user_id: int
@@ -146,7 +147,6 @@ class UserDashboard(BaseConfig):
 
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
-    model_config = ConfigDict(from_attributes=True) 
 
 class AuditLogItem(BaseConfig):
     timestamp: datetime
@@ -157,7 +157,3 @@ class AuditLogItem(BaseConfig):
     description: str
     points: int
     is_general: bool
-    
-class SystemInvite(BaseConfig):
-    code: str
-    is_used: bool

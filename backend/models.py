@@ -1,4 +1,3 @@
-# backend/models.py
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint, UUID, Table
@@ -14,11 +13,7 @@ class UserRole(enum.Enum):
     user = "2"
 
 class UserStatus(enum.Enum):
-    PENDING = "PENDING" # Pendente de aprovação do ADMIN MASTER
-    ACTIVE = "ACTIVE"   # Pode logar no app
-
-class SectorStatus(enum.Enum):
-    PENDING = "PENDING" # Pendente de aprovação do LÍDER
+    PENDING = "PENDING"
     ACTIVE = "ACTIVE"
 
 class ActivityType(enum.Enum):
@@ -29,14 +24,12 @@ class CodeType(enum.Enum):
     general = "general"
     unique = "unique"
 
-# Tabela de Associação Usuário-Setor
 user_sectors = Table(
     'user_sectors', Base.metadata,
     Column('user_id', Integer, ForeignKey('users.user_id')),
     Column('sector_id', Integer, ForeignKey('sectors.sector_id'))
 )
 
-# --- NOVO: CONVITES DO SISTEMA (Porta de Entrada) ---
 class SystemInvite(Base):
     __tablename__ = "system_invites"
     id = Column(Integer, primary_key=True, index=True)
@@ -44,7 +37,6 @@ class SystemInvite(Base):
     is_used = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
-# --- INSÍGNIAS ---
 class Badge(Base):
     __tablename__ = "badges"
     badge_id = Column(Integer, primary_key=True, index=True)
@@ -63,16 +55,13 @@ class UserBadge(Base):
     user = relationship("User", back_populates="badges")
     badge = relationship("Badge", back_populates="awards")
 
-# --- MODELOS PRINCIPAIS ---
 class Sector(Base):
     __tablename__ = "sectors"
     sector_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     invite_code = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
-    
     lider_id = Column(Integer, ForeignKey("users.user_id", use_alter=True, name="fk_sector_lider"), nullable=True)
     lider = relationship("User", foreign_keys=[lider_id], back_populates="led_sector")
-    
     members = relationship("User", secondary=user_sectors, back_populates="sectors")
     activities = relationship("Activity", back_populates="sector")
     redeem_codes = relationship("RedeemCode", back_populates="sector")
@@ -84,20 +73,14 @@ class User(Base):
     username = Column(String(50), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
-    
-    # Status GERAL (Aprovação do Admin Master)
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
-    
-    # Perfil
     nickname = Column(String(50), nullable=True)
     birth_date = Column(DateTime, nullable=True)
     profile_pic = Column(String(500), nullable=True)
     points_budget = Column(Integer, default=0) 
-    
     sectors = relationship("Sector", secondary=user_sectors, back_populates="members")
     led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
     badges = relationship("UserBadge", back_populates="user")
-    
     checkins = relationship("CheckIn", back_populates="user")
     created_activities = relationship("Activity", back_populates="creator")
     created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
@@ -106,7 +89,6 @@ class User(Base):
 
 class Activity(Base):
     __tablename__ = "activities"
-    
     activity_id = Column(Integer, primary_key=True, index=True)
     title = Column(String(150), nullable=False)
     description = Column(String, nullable=True)
@@ -116,13 +98,12 @@ class Activity(Base):
     points_value = Column(Integer, nullable=False, default=10) 
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
-
-    # NOVO CAMPO: Código aleatório para check-in (ex: A1B2C)
+    
+    # CAMPO QUE FALTAVA:
     checkin_code = Column(String(20), unique=True, nullable=True) 
 
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
-    
     sector = relationship("Sector", back_populates="activities")
     creator = relationship("User", back_populates="created_activities")
     checkins = relationship("CheckIn", back_populates="activity")
@@ -133,7 +114,6 @@ class CheckIn(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     activity_id = Column(Integer, ForeignKey("activities.activity_id"), nullable=False)
     timestamp = Column(DateTime, server_default=func.now())
-    
     user = relationship("User", back_populates="checkins")
     activity = relationship("Activity", back_populates="checkins")
     __table_args__ = (UniqueConstraint('user_id', 'activity_id', name='_user_activity_uc'),)
@@ -147,11 +127,9 @@ class RedeemCode(Base):
     is_redeemed = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
-
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) 
-
     sector = relationship("Sector", back_populates="redeem_codes")
     creator = relationship("User", back_populates="created_codes", foreign_keys=[created_by])
     assigned_user = relationship("User", back_populates="assigned_codes", foreign_keys=[assigned_user_id])
@@ -163,7 +141,6 @@ class GeneralCodeRedemption(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     code_id = Column(Integer, ForeignKey("redeem_codes.code_id"), nullable=False)
     timestamp = Column(DateTime, server_default=func.now())
-    
     user = relationship("User", back_populates="general_redemptions")
     code = relationship("RedeemCode", back_populates="general_redemptions")
     __table_args__ = (UniqueConstraint('user_id', 'code_id', name='_user_code_uc'),)
