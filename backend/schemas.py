@@ -77,7 +77,6 @@ class AddBudgetRequest(BaseConfig):
     points: int
 
 class CodeCreateGeneral(BaseConfig):
-    code_string: str
     points_value: int = 10
     is_general: bool = False
 class CodeCreateUnique(BaseConfig):

@@ -87,10 +87,17 @@ class ApiService {
     throw Exception('Erro resgatar');
   }
 
-  Future<String> checkIn(String activityId, String token) async {
-    final response = await http.post(Uri.parse('$_baseUrl/user/checkin'), headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"}, body: jsonEncode({"activity_id": int.parse(activityId)}));
-    if (response.statusCode == 200) return jsonDecode(response.body)['detail'];
-    throw Exception('Erro checkin');
+  Future<String> checkIn(String activityCode, String token) async {
+    final url = Uri.parse('$_baseUrl/user/checkin');
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
+      // ENVIA COMO STRING AGORA
+      body: jsonEncode({"activity_code": activityCode}), 
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) return data['detail'];
+    throw Exception(data['detail'] ?? 'Falha ao fazer check-in');
   }
 
   // --- RANKING ---
@@ -258,14 +265,21 @@ class ApiService {
      throw Exception('Erro buscar users setor');
   }
 
-  Future<void> createAdminGeneralCode(String token, {required String codeString, required int pointsValue}) async {
+  Future<void> createAdminGeneralCode(String token, {required int pointsValue}) async {
     final url = Uri.parse('$_baseUrl/admin-master/codes/general');
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
-      body: jsonEncode({"code_string": codeString, "points_value": pointsValue, "is_general": true}),
+      body: jsonEncode({
+        // Não enviamos mais "code_string", o backend gera
+        "points_value": pointsValue,
+        "is_general": true
+      }),
     );
-    if (response.statusCode != 201 && response.statusCode != 200) throw Exception('Falha ao criar código geral');
+    
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Falha ao criar código geral');
+    }
   }
 
   Future<String> createSystemInvite(String token) async {

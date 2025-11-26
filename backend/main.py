@@ -55,7 +55,8 @@ def join(req: schemas.JoinSectorRequest, db: Session = Depends(get_db), u: model
 
 @app.post("/user/checkin")
 def checkin(req: schemas.CheckInRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"detail": crud.create_checkin(db, u, req.activity_id)} # activity_id aqui vira o codigo no crud
+    # Passa req.activity_code (string)
+    return {"detail": crud.create_checkin(db, u, req.activity_code)}
 
 @app.post("/user/redeem")
 def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):

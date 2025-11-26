@@ -101,6 +101,7 @@ def create_activity(db: Session, activity_data: schemas.ActivityCreate, creator:
     return new_activity
 
 def create_checkin(db: Session, user: models.User, activity_code: str):
+    # ... (lógica de busca igual à anterior) ...
     activity = db.query(models.Activity).filter(models.Activity.checkin_code == activity_code).first()
     if not activity: return "Código de atividade inválido."
     if not activity.is_general and activity.sector not in user.sectors:
@@ -114,11 +115,21 @@ def create_checkin(db: Session, user: models.User, activity_code: str):
 def create_general_code(db: Session, code_data: schemas.CodeCreateGeneral, creator: models.User):
     is_general = (creator.role == models.UserRole.admin) or code_data.is_general
     sector_id = creator.led_sector.sector_id if creator.led_sector else None
+    
+    # GERA AUTOMÁTICO AGORA (8 DÍGITOS)
+    code = generate_short_code(8) 
+
     new_code = models.RedeemCode(
-        code_string=code_data.code_string, points_value=code_data.points_value,
-        type=models.CodeType.general, sector_id=sector_id, created_by=creator.user_id, is_general=is_general
+        code_string=code, # Usa o gerado
+        points_value=code_data.points_value,
+        type=models.CodeType.general,
+        sector_id=sector_id,
+        created_by=creator.user_id,
+        is_general=is_general
     )
-    db.add(new_code); db.commit(); db.refresh(new_code)
+    db.add(new_code)
+    db.commit()
+    db.refresh(new_code)
     return new_code
 
 def redeem_code(db: Session, user: models.User, code: models.RedeemCode):

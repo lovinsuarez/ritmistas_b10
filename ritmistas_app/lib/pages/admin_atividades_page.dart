@@ -57,58 +57,88 @@ class _AdminAtividadesPageState extends State<AdminAtividadesPage> {
 
   // --- ALTERAÇÃO FEITA AQUI ---
   void _showQRCode(Activity activity) {
+    
+    // --- AQUI ESTÁ A LINHA MÁGICA ---
+    // Se tiver código aleatório (checkinCode), usa ele. 
+    // Se não tiver (atividade antiga), usa o ID numérico.
+    String codigoParaMostrar = activity.checkinCode ?? activity.activityId.toString();
+    // -------------------------------
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(activity.title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18), textAlign: TextAlign.center),
+            const Text(
+              "Escaneie para confirmar presença",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
             const SizedBox(height: 20),
             
-            // 1. QR Code atualizado para checkinCode
+            // O QR Code (Agora usa a variável)
             SizedBox(
               height: 200, width: 200,
               child: QrImageView(
-                data: activity.checkinCode ?? "ERRO", // <--- USANDO O CÓDIGO NOVO
-                version: QrVersions.auto, 
-                backgroundColor: Colors.white
+                data: codigoParaMostrar, // <--- MUDOU AQUI
+                version: QrVersions.auto,
+                backgroundColor: Colors.white,
               ),
             ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // O Código Manual
+            const Text(
+              "Ou digite o código:",
+              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey[400]!),
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text("CÓDIGO MANUAL", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    
-                    // 2. Texto manual atualizado para checkinCode
-                    Text(
-                      activity.checkinCode ?? "---", // <--- USANDO O CÓDIGO NOVO
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black)
+                  Text(
+                    codigoParaMostrar, // <--- MUDOU AQUI TAMBÉM
+                    style: const TextStyle(
+                      color: Colors.black, 
+                      fontSize: 28, 
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0
                     ),
-                  ]),
-                  
-                  IconButton(
-                    icon: const Icon(Icons.copy, color: Colors.black),
-                    onPressed: () {
-                      // 3. Copiar para área de transferência atualizado
-                      Clipboard.setData(ClipboardData(text: activity.checkinCode ?? "")); // <--- COPIANDO O CÓDIGO NOVO
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green));
-                    },
                   ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.copy, color: Colors.black54),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: codigoParaMostrar)); // <--- E AQUI
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green),
+                      );
+                    },
+                  )
                 ],
               ),
-            )
+            ),
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("FECHAR", style: TextStyle(color: Colors.black)))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("FECHAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

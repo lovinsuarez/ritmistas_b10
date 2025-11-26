@@ -23,7 +23,7 @@ class _ResgatePageState extends State<ResgatePage> {
     if (code.isEmpty) return;
 
     setState(() => _isLoading = true);
-    FocusScope.of(context).unfocus(); // Fecha o teclado
+    FocusScope.of(context).unfocus();
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -32,35 +32,30 @@ class _ResgatePageState extends State<ResgatePage> {
 
       String message = "";
       
-      // LÓGICA DUPLA:
-      // 1. Tenta resgatar como Código Promocional (Ex: FESTA10)
+      // ESTRATÉGIA DUPLA (SEM VERIFICAR SE É NÚMERO):
+      
+      // 1. Tenta como Código de Resgate (Tabela RedeemCodes)
       try {
         message = await _apiService.redeemCode(code, token);
       } catch (e) {
-        // 2. Se falhar, tenta como ID de Atividade (Ex: 123)
-        // (Mas só se o código for numérico ou parecer um ID)
+        // 2. Se falhar, Tenta IMEDIATAMENTE como Check-in de Atividade (Tabela Activities)
+        // Agora aceita letras (ex: CFPEZH)
         try {
            message = await _apiService.checkIn(code, token);
         } catch (e2) {
-           // Se falhar nos dois, assume que o código é inválido mesmo
-           throw Exception("Código inválido ou expirado.");
+           // Se falhar nos dois, aí sim é erro
+           throw Exception("Código inválido.");
         }
       }
 
       if (mounted) {
-        // Sucesso! Mostra mensagem verde.
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.cardBackground,
-            title: const Text("Sucesso!", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            title: const Text("Sucesso!", style: TextStyle(color: Colors.green)),
             content: Text(message, style: const TextStyle(color: Colors.white)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx), 
-                child: const Text("OK")
-              )
-            ],
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
           ),
         );
         _codeController.clear();
@@ -68,11 +63,7 @@ class _ResgatePageState extends State<ResgatePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll("Exception: ", "")),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
+          SnackBar(content: Text(e.toString().replaceAll("Exception: ", "")), backgroundColor: Colors.red)
         );
       }
     } finally {

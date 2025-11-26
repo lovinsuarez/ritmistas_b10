@@ -16,11 +16,12 @@ class AdminMasterPontosPage extends StatefulWidget {
 
 class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
   final _formKey = GlobalKey<FormState>();
-  final _codeController = TextEditingController();
-  final _pointsController = TextEditingController(text: "50");
-  final ApiService _apiService = ApiService();
   
-  late Future<List<CodeDetail>> _codesFuture; // Future para a lista
+  // NÃO PRECISA MAIS DO CONTROLLER DE CÓDIGO, POIS É AUTOMÁTICO
+  final _pointsController = TextEditingController(text: "50");
+  
+  final ApiService _apiService = ApiService();
+  late Future<List<CodeDetail>> _codesFuture;
   String? _token;
   bool _isLoading = false;
 
@@ -48,20 +49,26 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
     setState(() => _isLoading = true);
 
     try {
+      // CHAMADA ATUALIZADA: Só enviamos os pontos. O backend gera o código.
       await _apiService.createAdminGeneralCode(
         _token!,
-        codeString: _codeController.text.trim(),
+        // codeString: ... (REMOVIDO)
         pointsValue: int.parse(_pointsController.text),
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Criado com sucesso!"), backgroundColor: Colors.green));
-        _showQRCodeDialog(_codeController.text.trim(), _pointsController.text);
-        _codeController.clear();
-        _refreshList(); // Atualiza a lista embaixo
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Código gerado com sucesso!"), backgroundColor: Colors.green),
+        );
+        // Atualiza a lista para o novo código aparecer no topo
+        _refreshList();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -127,36 +134,31 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text("Gerar Pontos Gerais", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          controller: _codeController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(labelText: "Código (Ex: FESTA)", prefixIcon: Icon(Icons.vpn_key)),
-                          validator: (v) => v!.isEmpty ? "*" : null,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 1,
-                        child: TextFormField(
-                          controller: _pointsController,
-                          style: const TextStyle(color: Colors.white),
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: "Pts", prefixIcon: Icon(Icons.star)),
-                          validator: (v) => v!.isEmpty ? "*" : null,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  const Text(
+                    "O sistema criará um código aleatório seguro.", 
+                    style: TextStyle(color: Colors.grey, fontSize: 12)
                   ),
+                  const SizedBox(height: 20),
+                  
+                  // APENAS CAMPO DE PONTOS
+                  TextFormField(
+                    controller: _pointsController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: "Valor em Pontos", prefixIcon: Icon(Icons.star)),
+                    validator: (v) => v!.isEmpty ? "Obrigatório" : null,
+                  ),
+                  
                   const SizedBox(height: 16),
+                  
+                  // BOTÃO DE GERAR
                   ElevatedButton.icon(
                     onPressed: _isLoading ? null : _createCode,
-                    icon: _isLoading ? const SizedBox() : const Icon(Icons.add_circle, color: Colors.black),
-                    label: _isLoading ? const CircularProgressIndicator(color: Colors.black) : const Text("CRIAR CÓDIGO"),
+                    icon: _isLoading ? const SizedBox() : const Icon(Icons.auto_fix_high, color: Colors.black),
+                    label: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.black) 
+                      : const Text("GERAR CÓDIGO AUTOMÁTICO"),
                   ),
                 ],
               ),
@@ -169,7 +171,17 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
               future: _codesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError) return Center(child: Text("Erro: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text("Erro: ${snapshot.error}", style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
+                        ElevatedButton(onPressed: _refreshList, child: const Text("Tentar Novamente"))
+                      ],
+                    ),
+                  );
+                }
                 
                 final codes = snapshot.data ?? [];
                 

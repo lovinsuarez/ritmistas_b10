@@ -61,6 +61,9 @@ class Activity {
   final String type;
   final String? address;
   final bool isGeneral;
+  
+  // CAMPO NOVO QUE FALTAVA:
+  final String? checkinCode; 
 
   Activity({
     required this.activityId,
@@ -70,6 +73,7 @@ class Activity {
     required this.type,
     this.address,
     required this.isGeneral,
+    this.checkinCode, // Adicionado ao construtor
   });
 
   factory Activity.fromJson(Map<String, dynamic> json) {
@@ -81,6 +85,9 @@ class Activity {
       type: json['type'],
       address: json['address'],
       isGeneral: json['is_general'] ?? false,
+      
+      // Mapeia do JSON que vem do backend
+      checkinCode: json['checkin_code'], 
     );
   }
 }
