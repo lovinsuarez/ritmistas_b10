@@ -1,10 +1,35 @@
 // lib/models/app_models.dart
 
-// Este arquivo guarda APENAS a estrutura dos dados.
-// Assim, qualquer página pode usá-los sem dar erro.
+import 'package:intl/intl.dart';
 
-import 'package:intl/intl.dart'; // Para datas
+// --- RANKING (A classe que você estava procurando) ---
+class RankingEntry {
+  final int userId;
+  final String username;
+  final String? nickname;   // Apelido
+  final String? profilePic; // Foto (URL ou Base64)
+  final int totalPoints;
 
+  RankingEntry({
+    required this.userId,
+    required this.username,
+    this.nickname,
+    this.profilePic,
+    required this.totalPoints,
+  });
+
+  factory RankingEntry.fromJson(Map<String, dynamic> json) {
+    return RankingEntry(
+      userId: json['user_id'],
+      username: json['username'],
+      nickname: json['nickname'],
+      profilePic: json['profile_pic'],
+      totalPoints: json['total_points'],
+    );
+  }
+}
+
+// --- INSÍGNIAS ---
 class Badge {
   final int badgeId;
   final String name;
@@ -37,6 +62,7 @@ class UserBadge {
   }
 }
 
+// --- USUÁRIO E PERFIL ---
 class UserSectorPoints {
   final int sectorId;
   final String sectorName;
@@ -49,45 +75,6 @@ class UserSectorPoints {
       sectorId: json['sector_id'],
       sectorName: json['sector_name'],
       points: json['points'],
-    );
-  }
-}
-
-class Activity {
-  final int activityId;
-  final String title;
-  final DateTime activityDate;
-  final int pointsValue;
-  final String type;
-  final String? address;
-  final bool isGeneral;
-  
-  // CAMPO NOVO QUE FALTAVA:
-  final String? checkinCode; 
-
-  Activity({
-    required this.activityId,
-    required this.title,
-    required this.activityDate,
-    required this.pointsValue,
-    required this.type,
-    this.address,
-    required this.isGeneral,
-    this.checkinCode, // Adicionado ao construtor
-  });
-
-  factory Activity.fromJson(Map<String, dynamic> json) {
-    return Activity(
-      activityId: json['activity_id'],
-      title: json['title'],
-      activityDate: DateTime.parse(json['activity_date']),
-      pointsValue: json['points_value'],
-      type: json['type'],
-      address: json['address'],
-      isGeneral: json['is_general'] ?? false,
-      
-      // Mapeia do JSON que vem do backend
-      checkinCode: json['checkin_code'], 
     );
   }
 }
@@ -118,6 +105,7 @@ class UserAdminView {
   }
 }
 
+// --- ESTRUTURA ---
 class Sector {
   final int sectorId;
   final String name;
@@ -136,13 +124,55 @@ class Sector {
   }
 }
 
+// --- ATIVIDADES ---
+class Activity {
+  final int activityId;
+  final String title;
+  final DateTime activityDate;
+  final int pointsValue;
+  final String type;
+  final String? address;
+  final bool isGeneral;
+  final String? checkinCode; // Código aleatório (V4.0)
+
+  Activity({
+    required this.activityId,
+    required this.title,
+    required this.activityDate,
+    required this.pointsValue,
+    required this.type,
+    this.address,
+    required this.isGeneral,
+    this.checkinCode,
+  });
+
+  factory Activity.fromJson(Map<String, dynamic> json) {
+    return Activity(
+      activityId: json['activity_id'],
+      title: json['title'],
+      activityDate: DateTime.parse(json['activity_date']),
+      pointsValue: json['points_value'],
+      type: json['type'],
+      address: json['address'],
+      isGeneral: json['is_general'] ?? false,
+      checkinCode: json['checkin_code'],
+    );
+  }
+}
+
+// --- DASHBOARD E CÓDIGOS ---
 class CheckInDetail {
   final String title;
   final int points;
   final DateTime date;
+
   CheckInDetail({required this.title, required this.points, required this.date});
+
   factory CheckInDetail.fromJson(Map<String, dynamic> json) => CheckInDetail(
-    title: json['title'], points: json['points'], date: DateTime.parse(json['date']));
+    title: json['title'],
+    points: json['points'],
+    date: DateTime.parse(json['date']),
+  );
 }
 
 class CodeDetail {
@@ -152,15 +182,11 @@ class CodeDetail {
 
   CodeDetail({required this.codeString, required this.points, required this.date});
 
-  factory CodeDetail.fromJson(Map<String, dynamic> json) {
-    return CodeDetail(
-      codeString: json['code_string'],
-      // O Backend agora manda 'points_value', nós mapeamos para 'points'
-      points: json['points_value'], 
-      // O Backend agora manda 'created_at', nós mapeamos para 'date'
-      date: DateTime.parse(json['created_at']), 
-    );
-  }
+  factory CodeDetail.fromJson(Map<String, dynamic> json) => CodeDetail(
+    codeString: json['code_string'],
+    points: json['points_value'], // Mapeado corretamente do backend
+    date: DateTime.parse(json['created_at']),
+  );
 }
 
 class UserDashboard {
@@ -169,7 +195,15 @@ class UserDashboard {
   final int totalPoints;
   final List<CheckInDetail> checkins;
   final List<CodeDetail> redeemedCodes;
-  UserDashboard({required this.userId, required this.username, required this.totalPoints, required this.checkins, required this.redeemedCodes});
+
+  UserDashboard({
+    required this.userId,
+    required this.username,
+    required this.totalPoints,
+    required this.checkins,
+    required this.redeemedCodes,
+  });
+
   factory UserDashboard.fromJson(Map<String, dynamic> json) {
     return UserDashboard(
       userId: json['user_id'],
@@ -177,6 +211,42 @@ class UserDashboard {
       totalPoints: json['total_points'],
       checkins: (json['checkins'] as List).map((i) => CheckInDetail.fromJson(i)).toList(),
       redeemedCodes: (json['redeemed_codes'] as List).map((i) => CodeDetail.fromJson(i)).toList(),
+    );
+  }
+}
+
+// --- AUDITORIA ---
+class AuditLogItem {
+  final DateTime timestamp;
+  final String type;
+  final String userName;
+  final String liderName;
+  final String sectorName;
+  final String description;
+  final int points;
+  final bool isGeneral;
+
+  AuditLogItem({
+    required this.timestamp,
+    required this.type,
+    required this.userName,
+    required this.liderName,
+    required this.sectorName,
+    required this.description,
+    required this.points,
+    required this.isGeneral,
+  });
+
+  factory AuditLogItem.fromJson(Map<String, dynamic> json) {
+    return AuditLogItem(
+      timestamp: DateTime.parse(json['timestamp']),
+      type: json['type'],
+      userName: json['user_name'],
+      liderName: json['lider_name'],
+      sectorName: json['sector_name'],
+      description: json['description'],
+      points: json['points'],
+      isGeneral: json['is_general'],
     );
   }
 }

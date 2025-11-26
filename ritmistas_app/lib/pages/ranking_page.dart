@@ -3,28 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
+import 'package:ritmistas_app/models/app_models.dart'; // <--- IMPORTANTE: Traz os modelos
 import 'package:shared_preferences/shared_preferences.dart';
-
-// Modelo de Dados
-class RankingEntry {
-  final int userId;
-  final String username;
-  final int totalPoints;
-
-  RankingEntry({
-    required this.userId,
-    required this.username,
-    required this.totalPoints,
-  });
-
-  factory RankingEntry.fromJson(Map<String, dynamic> json) {
-    return RankingEntry(
-      userId: json['user_id'],
-      username: json['username'],
-      totalPoints: json['total_points'],
-    );
-  }
-}
+import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart'; // Para navegar ao clicar no setor
+import 'dart:convert'; // Para decodificar a foto
 
 class RankingPage extends StatefulWidget {
   const RankingPage({super.key});
@@ -55,31 +37,25 @@ class _RankingPageState extends State<RankingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Removemos a AppBar daqui pois ela já existe na HomePage, 
-      // mas precisamos de um espaço para a TabBar.
       body: FutureBuilder<Map<String, dynamic>>(
         future: _userDataFuture,
         builder: (context, snapshot) {
-          // 1. Carregando dados do usuário
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow));
           }
           
-          // 2. Erro ao carregar usuário
           if (snapshot.hasError) {
             return Center(child: Text("Erro: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
           }
 
           final userData = snapshot.data!;
-          // Lista de setores onde o usuário tem pontos/presença
+          // Lista de setores onde o usuário tem pontos
           final List<dynamic> userSectors = userData['points_by_sector'] ?? [];
 
           // --- CONSTRUÇÃO DAS ABAS ---
-          // Aba 1 sempre fixa: GERAL B10
-          List<Widget> myTabs = [const Tab(text: "Geral B10")];
+          List<Widget> myTabs = [const Tab(text: "GERAL B10")];
           List<Widget> myViews = [const RankingListView(type: RankingType.geral)];
 
-          // Abas dinâmicas: Uma para cada setor do usuário
           for (var sector in userSectors) {
             myTabs.add(Tab(text: sector['sector_name'].toString().toUpperCase()));
             myViews.add(RankingListView(
@@ -88,16 +64,14 @@ class _RankingPageState extends State<RankingPage> {
             ));
           }
 
-          // Controlador das Abas
           return DefaultTabController(
             length: myTabs.length,
             child: Column(
               children: [
-                // A Barra de Abas (Amarela e Preta)
                 Container(
                   color: AppColors.background,
                   child: TabBar(
-                    isScrollable: true, // Permite rolar se tiver muitos setores
+                    isScrollable: true,
                     indicatorColor: AppColors.primaryYellow,
                     labelColor: AppColors.primaryYellow,
                     unselectedLabelColor: Colors.grey,
@@ -105,7 +79,6 @@ class _RankingPageState extends State<RankingPage> {
                     tabs: myTabs,
                   ),
                 ),
-                // O Conteúdo das Listas
                 Expanded(
                   child: TabBarView(
                     children: myViews,
@@ -125,7 +98,7 @@ enum RankingType { geral, sector }
 
 class RankingListView extends StatefulWidget {
   final RankingType type;
-  final int? sectorId; // Só usado se type == sector
+  final int? sectorId;
 
   const RankingListView({super.key, required this.type, this.sectorId});
 
@@ -164,7 +137,7 @@ class _RankingListViewState extends State<RankingListView> with AutomaticKeepAli
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Mantém a aba viva ao trocar
+    super.build(context);
 
     return FutureBuilder<Map<String, dynamic>>(
       future: _rankingFuture,
@@ -203,18 +176,29 @@ class _RankingListViewState extends State<RankingListView> with AutomaticKeepAli
           color: AppColors.primaryYellow,
           backgroundColor: Colors.grey[900],
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Espaço em baixo
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: ranking.length,
             itemBuilder: (context, index) {
               final entry = ranking[index];
               final position = index + 1;
               final bool isMe = (entry.userId == myUserId);
 
-              // Cores especiais para o Top 3
               Color posColor = Colors.white;
-              if (position == 1) posColor = const Color(0xFFFFD700); // Ouro
-              if (position == 2) posColor = const Color(0xFFC0C0C0); // Prata
-              if (position == 3) posColor = const Color(0xFFCD7F32); // Bronze
+              if (position == 1) posColor = const Color(0xFFFFD700);
+              if (position == 2) posColor = const Color(0xFFC0C0C0);
+              if (position == 3) posColor = const Color(0xFFCD7F32);
+              
+              // Helper para imagem
+              ImageProvider? imageProvider;
+              if (entry.profilePic != null && entry.profilePic!.isNotEmpty) {
+                if (entry.profilePic!.startsWith('http')) {
+                  imageProvider = NetworkImage(entry.profilePic!);
+                } else if (entry.profilePic!.startsWith('data:image')) {
+                  try {
+                    imageProvider = MemoryImage(base64Decode(entry.profilePic!.split(',')[1]));
+                  } catch(e) {}
+                }
+              }
 
               return Card(
                 color: AppColors.cardBackground,
@@ -235,22 +219,25 @@ class _RankingListViewState extends State<RankingListView> with AutomaticKeepAli
                           child: Text(
                             "$positionº",
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18, 
-                              fontWeight: FontWeight.bold, 
-                              color: posColor
-                            ),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: posColor),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        CircleAvatar(
-                          backgroundColor: Colors.grey[800],
-                          child: const Icon(Icons.person, color: Colors.white54),
+                        // FOTO DO USUÁRIO NO RANKING
+                        Container(
+                           height: 40, width: 40,
+                           decoration: BoxDecoration(
+                             shape: BoxShape.circle,
+                             color: Colors.grey[800],
+                             image: imageProvider != null ? DecorationImage(image: imageProvider, fit: BoxFit.cover) : null
+                           ),
+                           child: imageProvider == null ? const Icon(Icons.person, color: Colors.white54) : null,
                         ),
                       ],
                     ),
                     title: Text(
-                      entry.username,
+                      // Mostra Apelido se tiver, senão Nome
+                      (entry.nickname != null && entry.nickname!.isNotEmpty) ? entry.nickname! : entry.username,
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
@@ -259,11 +246,7 @@ class _RankingListViewState extends State<RankingListView> with AutomaticKeepAli
                     ),
                     trailing: Text(
                       "${entry.totalPoints} pts",
-                      style: const TextStyle(
-                        color: AppColors.primaryYellow,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                      style: const TextStyle(color: AppColors.primaryYellow, fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ),
                 ),
