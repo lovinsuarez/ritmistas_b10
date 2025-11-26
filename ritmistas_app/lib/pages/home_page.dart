@@ -142,6 +142,8 @@ class _UserScaffoldState extends State<UserScaffold> {
         title: _buildAppBarTitle('Ritmistas B10'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+
+        
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
@@ -161,11 +163,11 @@ class _UserScaffoldState extends State<UserScaffold> {
         animationCurve: Curves.easeInOut,
         animationDuration: const Duration(milliseconds: 300),
         onTap: (index) {
-          if (index == 1) {
-             Navigator.push(context, MaterialPageRoute(builder: (context) => const ScanPage()));
-          } else {
-             setState(() => _selectedIndex = index);
-          }
+          // CORREÇÃO: Removemos a lógica especial do índice 1.
+          // Agora ele apenas muda a aba para a ResgatePage, como qualquer outra aba.
+          setState(() {
+            _selectedIndex = index;
+          });
         },
       ),
     );

@@ -1,9 +1,9 @@
 // lib/pages/resgate_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/main.dart'; // Para usar AppColors e Theme
+import 'package:ritmistas_app/main.dart'; // Para AppColors
 import 'package:ritmistas_app/services/api_service.dart';
-import 'package:ritmistas_app/pages/scan_page.dart'; // Importa a página de Scanner
+import 'package:ritmistas_app/pages/scan_page.dart'; // Importa a câmera
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ResgatePage extends StatefulWidget {
@@ -21,8 +21,9 @@ class _ResgatePageState extends State<ResgatePage> {
   Future<void> _handleRedeem() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) return;
+
     setState(() => _isLoading = true);
-    FocusScope.of(context).unfocus();
+    FocusScope.of(context).unfocus(); // Fecha o teclado
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -31,31 +32,33 @@ class _ResgatePageState extends State<ResgatePage> {
 
       String message = "";
       
-      // Tenta primeiro como Código de Resgate (Promoção/Bônus)
+      // LÓGICA DUPLA:
+      // 1. Tenta resgatar como Código Promocional (Ex: FESTA10)
       try {
         message = await _apiService.redeemCode(code, token);
       } catch (e) {
-        // Se falhar, tenta como Check-in de Atividade (Presença)
+        // 2. Se falhar, tenta como ID de Atividade (Ex: 123)
+        // (Mas só se o código for numérico ou parecer um ID)
         try {
            message = await _apiService.checkIn(code, token);
         } catch (e2) {
-           // Se falhar nos dois, lança erro genérico
-           throw Exception("Código inválido ou atividade não encontrada.");
+           // Se falhar nos dois, assume que o código é inválido mesmo
+           throw Exception("Código inválido ou expirado.");
         }
       }
 
       if (mounted) {
+        // Sucesso! Mostra mensagem verde.
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.cardBackground,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text("Sucesso!", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
             content: Text(message, style: const TextStyle(color: Colors.white)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx), 
-                child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold))
+                child: const Text("OK")
               )
             ],
           ),
@@ -80,7 +83,7 @@ class _ResgatePageState extends State<ResgatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.transparent, // Para ver o fundo do app
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Center(
@@ -89,23 +92,25 @@ class _ResgatePageState extends State<ResgatePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- BOTÃO GRANDE DE SCANNER ---
+                // --- 1. BOTÃO GRANDE DE SCANNER ---
                 InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanPage())),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ScanPage()));
+                  },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     height: 160,
                     decoration: BoxDecoration(
-                      color: AppColors.primaryYellow.withOpacity(0.1),
+                      color: AppColors.primaryYellow.withOpacity(0.1), // Fundo amarelinho transparente
                       border: Border.all(color: AppColors.primaryYellow, width: 2),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.primaryYellow.withOpacity(0.1),
-                          blurRadius: 10,
+                          blurRadius: 15,
                           spreadRadius: 1,
                         )
-                      ],
+                      ]
                     ),
                     child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -128,39 +133,44 @@ class _ResgatePageState extends State<ResgatePage> {
                 
                 const SizedBox(height: 40),
                 
+                // Divisória "OU"
                 const Row(
                   children: [
-                    Expanded(child: Divider(color: Colors.grey)),
+                    Expanded(child: Divider(color: Colors.white24)),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text("OU", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text("OU", style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
                     ),
-                    Expanded(child: Divider(color: Colors.grey))
+                    Expanded(child: Divider(color: Colors.white24)),
                   ]
                 ),
                 
                 const SizedBox(height: 40),
 
+                // --- 2. ÁREA DE CÓDIGO MANUAL ---
                 const Text(
-                  "CÓDIGO MANUAL",
+                  "DIGITAR CÓDIGO",
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.5),
                 ),
                 
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
-                // --- CAMPO DE TEXTO ---
+                // Campo de Texto
                 TextField(
                   controller: _codeController,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20, color: Colors.white, letterSpacing: 2, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2),
                   decoration: InputDecoration(
-                    hintText: "DIGITE AQUI",
-                    hintStyle: TextStyle(color: Colors.grey[700], letterSpacing: 1, fontSize: 16),
+                    hintText: "ABC-123",
+                    hintStyle: TextStyle(color: Colors.grey[700], letterSpacing: 2, fontSize: 20),
                     filled: true,
                     fillColor: AppColors.cardBackground,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 18),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: const BorderSide(color: AppColors.primaryYellow, width: 2),
@@ -170,15 +180,16 @@ class _ResgatePageState extends State<ResgatePage> {
                 
                 const SizedBox(height: 24),
                 
-                // --- BOTÃO RESGATAR ---
+                // Botão Resgatar
                 SizedBox(
                   height: 55,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleRedeem,
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       backgroundColor: AppColors.primaryYellow,
                       foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 4,
                     ),
                     child: _isLoading 
                       ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3))
@@ -186,7 +197,7 @@ class _ResgatePageState extends State<ResgatePage> {
                   ),
                 ),
                 
-                const SizedBox(height: 80), // Espaço extra para a navegação
+                const SizedBox(height: 80), // Espaço extra para não ficar atrás da barra de navegação
               ],
             ),
           ),

@@ -35,20 +35,14 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     token = security.create_access_token(data={"sub": u.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
     return {"access_token": token, "token_type": "bearer"}
 
-# --- USER PROFILE & DATA ---
+# --- USER ---
 @app.get("/users/me", response_model=schemas.UserResponse)
 def me(db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    # 1. Calcula os pontos (como antes)
     points_data, total_global = crud.get_user_points_breakdown(db, u)
     u.points_by_sector = points_data
     u.total_global_points = total_global
-    
-    # 2. CORREÇÃO: Verifica se é líder e anexa o código
-    if u.led_sector:
-        u.invite_code = u.led_sector.invite_code
-    else:
-        u.invite_code = None
-        
+    if u.led_sector: u.invite_code = u.led_sector.invite_code
+    else: u.invite_code = None
     return u
 
 @app.put("/users/me/profile", response_model=schemas.User)
@@ -61,7 +55,7 @@ def join(req: schemas.JoinSectorRequest, db: Session = Depends(get_db), u: model
 
 @app.post("/user/checkin")
 def checkin(req: schemas.CheckInRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"detail": crud.create_checkin(db, u, req.activity_id)}
+    return {"detail": crud.create_checkin(db, u, req.activity_id)} # activity_id aqui vira o codigo no crud
 
 @app.post("/user/redeem")
 def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
@@ -69,7 +63,7 @@ def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: mod
     if not code: raise HTTPException(404, "Código inválido.")
     return {"detail": crud.redeem_code(db, u, code)}
 
-# --- RANKINGS ---
+# --- RANKING ---
 @app.get("/ranking/geral", response_model=schemas.RankingResponse)
 def rank_geral(month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
     return {"ranking": crud.get_geral_ranking(db, month, year), "my_user_id": u.user_id}
@@ -86,7 +80,25 @@ def distribute(req: schemas.DistributePointsRequest, db: Session = Depends(get_d
     if not success: raise HTTPException(400, msg)
     return {"detail": msg}
 
-@app.post("/lider/activities")
+@app.get("/lider/pending-users", response_model=List[schemas.UserAdminView])
+def pending(db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
+    # OBS: Retorna vazio pois aprovação agora é global
+    return []
+
+@app.put("/lider/approve-user/{user_id}")
+def approve(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
+    # Legado, mantido para não quebrar rota, mas funcionalidade movida pro Admin
+    u = crud.get_user_by_id(db, user_id)
+    if not u: raise HTTPException(404)
+    return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
+
+@app.delete("/lider/reject-user/{user_id}")
+def reject(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
+    u = crud.get_user_by_id(db, user_id)
+    crud.delete_user(db, u)
+    return {"ok": True}
+
+@app.post("/lider/activities", status_code=status.HTTP_201_CREATED)
 def create_act(act: schemas.ActivityCreate, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
     if not l.led_sector: raise HTTPException(400, "Sem setor.")
     return crud.create_activity(db, act, l)
@@ -119,7 +131,6 @@ def create_gen_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db),
 # --- ADMIN MASTER ---
 @app.post("/admin-master/system-invite")
 def create_sys_invite(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    """Gera um código de convite do sistema (para entrar no app)."""
     invite = crud.generate_system_invite(db)
     return {"code": invite.code}
 
@@ -129,12 +140,10 @@ def list_sys_invites(db: Session = Depends(get_db), a: models.User = Depends(sec
 
 @app.get("/admin-master/pending-global", response_model=List[schemas.UserAdminView])
 def get_pending_global(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    """Usuários que se registraram e esperam aprovação para entrar no app."""
     return crud.get_pending_global_users(db)
 
 @app.put("/admin-master/approve-global/{user_id}")
 def approve_global(user_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    """Aprova usuário para usar o app."""
     u = crud.get_user_by_id(db, user_id)
     return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
 
@@ -205,36 +214,13 @@ def download_audit(db: Session = Depends(get_db), a: models.User = Depends(secur
     response.headers["Content-Disposition"] = "attachment; filename=auditoria_b10.csv"
     return response
 
+# CORREÇÃO: Endpoint para Admin criar código geral
+@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
+def create_admin_general_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    d.is_general = True
+    return crud.create_general_code(db, d, a)
+
+# CORREÇÃO: Endpoint para Admin listar códigos gerais
 @app.get("/admin-master/codes/general", response_model=List[schemas.CodeDetail])
-def get_admin_codes(
-    db: Session = Depends(get_db), 
-    a: models.User = Depends(security.get_current_admin_master)
-):
+def get_admin_codes(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
     return crud.get_general_codes(db)
-
-@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
-def create_admin_general_code(
-    d: schemas.CodeCreateGeneral, 
-    db: Session = Depends(get_db), 
-    a: models.User = Depends(security.get_current_admin_master)
-):
-    """
-    [Admin Master] Cria um código de pontuação GERAL (Global).
-    Este código não pertence a nenhum setor específico.
-    """
-    # Força a flag de geral para True
-    d.is_general = True
-    
-    # Reutiliza a função do CRUD. 
-    # Como o Admin não tem 'led_sector', o sector_id ficará Null, o que é correto para códigos globais.
-    return crud.create_general_code(db, d, a)
-
-@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
-def create_admin_general_code(
-    d: schemas.CodeCreateGeneral, 
-    db: Session = Depends(get_db), 
-    a: models.User = Depends(security.get_current_admin_master)
-):
-    d.is_general = True
-    return crud.create_general_code(db, d, a)
-
