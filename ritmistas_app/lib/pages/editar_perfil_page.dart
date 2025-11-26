@@ -1,6 +1,9 @@
 // lib/pages/editar_perfil_page.dart
 
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // Importante para a galeria
 import 'package:intl/intl.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
@@ -26,22 +29,65 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
   final _formKey = GlobalKey<FormState>();
   final _nicknameController = TextEditingController();
   final _photoUrlController = TextEditingController();
-  
+
+  // Variável para guardar a imagem em Base64 se escolhida da galeria
+  String? _imageBase64;
+
   DateTime? _selectedDate;
   bool _isLoading = false;
   final ApiService _apiService = ApiService();
+  
+  // Instância do ImagePicker
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     if (widget.currentNickname != null) _nicknameController.text = widget.currentNickname!;
-    if (widget.currentPhotoUrl != null) _photoUrlController.text = widget.currentPhotoUrl!;
+    
+    // Se a imagem atual for URL, põe no controller. Se for base64 (antiga), põe na variável.
+    if (widget.currentPhotoUrl != null) {
+      if (widget.currentPhotoUrl!.startsWith('http')) {
+        _photoUrlController.text = widget.currentPhotoUrl!;
+      } else {
+        _imageBase64 = widget.currentPhotoUrl;
+      }
+    }
+
     if (widget.currentBirthDate != null) {
       try { _selectedDate = DateTime.parse(widget.currentBirthDate!); } catch (e) {}
     }
   }
 
-  // --- FUNÇÃO DE SELECIONAR DATA ---
+  // --- FUNÇÃO PARA ABRIR GALERIA ---
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50, // Reduz qualidade para não ficar gigante
+        maxWidth: 800,
+      );
+      
+      if (image != null) {
+        final bytes = await File(image.path).readAsBytes();
+        // Converte para Base64 para poder enviar e salvar
+        final String base64String = "data:image/jpeg;base64,${base64Encode(bytes)}";
+        
+        setState(() {
+          _imageBase64 = base64String;
+          // Limpa o campo de URL se o usuário escolheu uma imagem da galeria
+          _photoUrlController.clear();
+        });
+      }
+    } catch (e) {
+      print("Erro ao abrir galeria: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Erro ao abrir galeria. Verifique as permissões."), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  // Função para selecionar data
   Future<void> _pickDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -75,10 +121,16 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
       final token = prefs.getString('access_token');
       if (token == null) throw Exception("Não autenticado");
 
+      // Decide qual imagem enviar: a Base64 da galeria OU a URL do campo de texto
+      String? finalProfilePic = _imageBase64;
+      if (_photoUrlController.text.isNotEmpty) {
+        finalProfilePic = _photoUrlController.text;
+      }
+
       await _apiService.updateProfile(
         token,
         nickname: _nicknameController.text.isEmpty ? null : _nicknameController.text,
-        profilePic: _photoUrlController.text.isEmpty ? null : _photoUrlController.text,
+        profilePic: finalProfilePic,
         birthDate: _selectedDate,
       );
 
@@ -93,6 +145,17 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     }
   }
 
+  // Helper para mostrar a imagem no topo da tela de edição
+  ImageProvider? _getPreviewImage() {
+    if (_imageBase64 != null) {
+       try { return MemoryImage(base64Decode(_imageBase64!.split(',')[1])); } catch(e) { return null; }
+    }
+    if (_photoUrlController.text.isNotEmpty) {
+      return NetworkImage(_photoUrlController.text);
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,20 +166,68 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
           key: _formKey,
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: _photoUrlController.text.isNotEmpty ? NetworkImage(_photoUrlController.text) : null,
-                child: _photoUrlController.text.isEmpty ? const Icon(Icons.person, size: 50, color: Colors.white) : null,
+              // Preview da imagem (também clicável)
+              GestureDetector(
+                onTap: _pickImage,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey[800],
+                      backgroundImage: _getPreviewImage(),
+                      child: (_imageBase64 == null && _photoUrlController.text.isEmpty) 
+                          ? const Icon(Icons.person, size: 60, color: Colors.white) 
+                          : null,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(color: AppColors.primaryYellow, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, color: Colors.black, size: 20),
+                    )
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
+              TextButton(onPressed: _pickImage, child: const Text("Toque para escolher da Galeria")),
               
-              TextFormField(
-                controller: _photoUrlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: "URL da Foto (Link)", prefixIcon: Icon(Icons.link)),
-                onChanged: (val) => setState(() {}),
+              const SizedBox(height: 20),
+
+              // --- AQUI ESTÁ A MUDANÇA: CAMPO URL + BOTÃO GALERIA ---
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _photoUrlController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: "Ou cole a URL da Foto", 
+                        prefixIcon: Icon(Icons.link),
+                        hintText: "https://..."
+                      ),
+                      onChanged: (val) {
+                        // Se o usuário digitar uma URL, limpamos a imagem da galeria
+                        if (val.isNotEmpty) setState(() => _imageBase64 = null);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Botão da Galeria ao lado do campo
+                  Ink(
+                    decoration: const ShapeDecoration(
+                      color: AppColors.primaryYellow,
+                      shape: CircleBorder(),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.photo_library, color: Colors.black),
+                      tooltip: "Abrir Galeria",
+                      onPressed: _pickImage,
+                    ),
+                  ),
+                ],
               ),
+              // -------------------------------------------------------
               
               const SizedBox(height: 16),
               
@@ -128,9 +239,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
               
               const SizedBox(height: 16),
               
-              // --- AQUI ESTAVA O ERRO ---
               InkWell(
-                // Correção: Usamos () => _pickDate() para evitar erro de tipagem
                 onTap: () => _pickDate(),
                 child: InputDecorator(
                   decoration: const InputDecoration(
@@ -144,7 +253,6 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                   ),
                 ),
               ),
-              // --------------------------
 
               const SizedBox(height: 32),
               

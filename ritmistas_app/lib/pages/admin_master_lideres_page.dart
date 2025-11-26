@@ -1,8 +1,9 @@
 // lib/pages/admin_master_lideres_page.dart
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
+import 'package:ritmistas_app/models/app_models.dart'; // <--- ESTE IMPORT RESOLVE O ERRO
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminMasterLideresPage extends StatefulWidget {
@@ -43,8 +44,8 @@ class _AdminMasterLideresPageState extends State<AdminMasterLideresPage>
             labelColor: AppColors.primaryYellow,
             unselectedLabelColor: Colors.grey,
             tabs: const [
-              Tab(text: 'Promover Usuários'),
-              Tab(text: 'Gerenciar Líderes'),
+              Tab(text: 'Usuários / Insígnias'),
+              Tab(text: 'Líderes / Orçamento'),
             ],
           ),
         ),
@@ -70,7 +71,7 @@ class _AdminMasterLideresPageState extends State<AdminMasterLideresPage>
   bool get wantKeepAlive => true; 
 }
 
-// --- ABA 1: PROMOVER USUÁRIOS ---
+// --- ABA 1: LISTA DE USUÁRIOS (Promover + Dar Insígnia) ---
 class AllUsersListView extends StatefulWidget {
   final VoidCallback onUserPromoted;
   const AllUsersListView({super.key, required this.onUserPromoted});
@@ -110,6 +111,79 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
     );
   }
 
+  // --- DIÁLOGO: DAR INSÍGNIA ---
+  Future<void> _showAwardBadgeDialog(UserAdminView user) async {
+    // 1. Busca as insígnias disponíveis
+    List<Badge> allBadges = [];
+    try {
+      allBadges = await _apiService.getAllBadges(_token!);
+    } catch (e) {
+      _showError("Erro ao carregar insígnias: $e");
+      return;
+    }
+
+    // 2. Validação: Se não tiver insígnias, avisa e para.
+    if (allBadges.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.cardBackground,
+            title: const Text("Sem Insígnias", style: TextStyle(color: Colors.white)),
+            content: const Text("Você precisa criar insígnias primeiro na aba de 'Insígnias'.", style: TextStyle(color: Colors.white70)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Entendi"))
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 3. Se tiver insígnias, mostra a lista
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text("Dar Insígnia para ${user.username}", style: const TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: allBadges.length,
+            itemBuilder: (context, index) {
+              final badge = allBadges[index];
+              return ListTile(
+                leading: (badge.iconUrl != null && badge.iconUrl!.isNotEmpty)
+                    ? Image.network(badge.iconUrl!, width: 30, height: 30, errorBuilder: (c,e,s)=>const Icon(Icons.error))
+                    : const Icon(Icons.military_tech, color: AppColors.primaryYellow),
+                title: Text(badge.name, style: const TextStyle(color: Colors.white)),
+                onTap: () async {
+                  Navigator.pop(ctx); // Fecha o diálogo
+                  try {
+                    await _apiService.awardBadge(_token!, user.userId, badge.badgeId);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("${badge.name} concedida!"), backgroundColor: Colors.green)
+                      );
+                    }
+                  } catch (e) {
+                    _showError(e.toString());
+                  }
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text("Cancelar"))
+        ],
+      ),
+    );
+  }
+
   Future<void> _handlePromote(UserAdminView user) async {
     if (_token == null) return;
 
@@ -124,7 +198,7 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
     final availableSectors = allSectors.where((s) => s.liderId == null).toList();
 
     if (availableSectors.isEmpty) {
-      _showError("Não há setores sem líder. Crie um setor primeiro.");
+      _showError("Não há setores sem líder.");
       return;
     }
 
@@ -150,10 +224,7 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('Cancelar'),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: const Text('Cancelar')),
           ],
         );
       },
@@ -163,14 +234,8 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
       try {
         await _apiService.promoteUserToLider(_token!, user.userId);
         await _apiService.assignLiderToSector(_token!, selectedSector.sectorId, user.userId);
-
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${user.username} agora lidera ${selectedSector.name}!'),
-              backgroundColor: Colors.green
-            ),
-          );
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promovido com sucesso!'), backgroundColor: Colors.green));
         }
         _refresh(); 
         widget.onUserPromoted(); 
@@ -201,14 +266,36 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
               return Card(
                 color: AppColors.cardBackground,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white)),
-                  title: Text(user.username, style: const TextStyle(color: Colors.white)),
-                  subtitle: Text(user.email, style: const TextStyle(color: Colors.grey)),
-                  trailing: ElevatedButton(
-                    child: const Text('Promover'),
-                    onPressed: () => _handlePromote(user),
-                  ),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const CircleAvatar(backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white)),
+                      title: Text(user.username, style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(user.email, style: const TextStyle(color: Colors.grey)),
+                    ),
+                    // BOTÕES DE AÇÃO
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16, bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          // Botão INSÍGNIA
+                          TextButton.icon(
+                            icon: const Icon(Icons.military_tech, size: 18, color: AppColors.primaryYellow),
+                            label: const Text("Insígnia", style: TextStyle(color: AppColors.primaryYellow)),
+                            onPressed: () => _showAwardBadgeDialog(user),
+                          ),
+                          const SizedBox(width: 8),
+                          // Botão PROMOVER
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+                            onPressed: () => _handlePromote(user),
+                            child: const Text('Promover'),
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
                 ),
               );
             },
@@ -220,7 +307,7 @@ class _AllUsersListViewState extends State<AllUsersListView> with AutomaticKeepA
   @override bool get wantKeepAlive => true;
 }
 
-// --- ABA 2: GERENCIAR LÍDERES (COM BOTÃO DE ORÇAMENTO) ---
+// --- ABA 2: LÍDERES (Gerenciar + Dar Orçamento) ---
 class AllLidersListView extends StatefulWidget {
   const AllLidersListView({super.key});
   @override
@@ -252,30 +339,23 @@ class _AllLidersListViewState extends State<AllLidersListView> with AutomaticKee
     await _lidersFuture;
   }
 
-  // --- NOVO: Adicionar Orçamento ao Líder ---
   void _showAddBudgetDialog(UserAdminView lider) {
     final TextEditingController pointsCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: Text("Adicionar Orçamento para ${lider.username}", style: const TextStyle(color: Colors.white)),
+        title: Text("Orçamento para ${lider.username}", style: const TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              "Estes pontos poderão ser distribuídos pelo líder para sua equipe.",
-              style: TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            const Text("Adicionar pontos para o líder distribuir.", style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             TextField(
               controller: pointsCtrl,
               keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: "Quantidade de Pontos",
-                prefixIcon: Icon(Icons.add_circle, color: AppColors.primaryYellow),
-              ),
+              decoration: const InputDecoration(labelText: "Quantidade", prefixIcon: Icon(Icons.add_circle, color: AppColors.primaryYellow)),
             ),
           ],
         ),
@@ -285,17 +365,12 @@ class _AllLidersListViewState extends State<AllLidersListView> with AutomaticKee
             onPressed: () async {
               final int? points = int.tryParse(pointsCtrl.text);
               if (points == null || points <= 0) return;
-              
-              Navigator.pop(ctx); // Fecha dialog
+              Navigator.pop(ctx);
               try {
                 await _apiService.addBudget(_token!, lider.userId, points);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Adicionado $points pts para ${lider.username}!"), backgroundColor: Colors.green)
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Orçamento adicionado!"), backgroundColor: Colors.green));
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red)
-                );
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
               }
             },
             child: const Text("Adicionar"),
@@ -352,20 +427,15 @@ class _AllLidersListViewState extends State<AllLidersListView> with AutomaticKee
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // Botão Rebaixar (Pequeno e vermelho)
                             TextButton(
                               onPressed: () => _handleDemote(lider),
                               child: const Text("Rebaixar", style: TextStyle(color: Colors.red)),
                             ),
                             const SizedBox(width: 8),
-                            // Botão Adicionar Orçamento (Amarelo)
                             ElevatedButton.icon(
                               icon: const Icon(Icons.attach_money, size: 18),
                               label: const Text("Dar Orçamento"),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)
-                              ),
+                              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                               onPressed: () => _showAddBudgetDialog(lider),
                             ),
                           ],
