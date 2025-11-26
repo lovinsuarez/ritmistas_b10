@@ -39,10 +39,14 @@ class SystemInvite(Base):
 
 class Badge(Base):
     __tablename__ = "badges"
+    
     badge_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     description = Column(String(200))
-    icon_url = Column(String(500))
+    
+    # CORREÇÃO: Removido o limite (500) para aceitar Base64
+    icon_url = Column(String, nullable=True) 
+    
     created_at = Column(DateTime, server_default=func.now())
     awards = relationship("UserBadge", back_populates="badge")
 
@@ -76,7 +80,7 @@ class User(Base):
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
     nickname = Column(String(50), nullable=True)
     birth_date = Column(DateTime, nullable=True)
-    profile_pic = Column(String(500), nullable=True)
+    profile_pic = Column(String, nullable=True)
     points_budget = Column(Integer, default=0) 
     sectors = relationship("Sector", secondary=user_sectors, back_populates="members")
     led_sector = relationship("Sector", back_populates="lider", foreign_keys="[Sector.lider_id]", uselist=False)
