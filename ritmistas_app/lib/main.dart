@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
-import 'package:ritmistas_app/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_options.dart';
 import 'package:ritmistas_app/auth_check.dart';
 import 'package:ritmistas_app/pages/login.dart';
-// --- 1. DEFINIÇÃO DE CORES E TEMA ---
+import 'package:firebase_core/firebase_core.dart';
 
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Necessário para inicializar plugins antes do app
+  
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  runApp(const MyApp());
+}
+// --- 1. DEFINIÇÃO DE CORES E TEMA ---
 class AppColors {
   static const Color background = Color(0xFF121212); // Preto fundo
   static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
@@ -61,11 +70,6 @@ final ThemeData appTheme = ThemeData(
     labelStyle: const TextStyle(color: Colors.white70),
   ),
 );
-
-void main() {
-  runApp(const MyApp());
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 

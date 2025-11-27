@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:ritmistas_app/main.dart'; // AppColors
+import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
-import 'package:ritmistas_app/models/app_models.dart'; // Importa CodeDetail
+import 'package:ritmistas_app/models/app_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
@@ -17,7 +17,9 @@ class AdminMasterPontosPage extends StatefulWidget {
 class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
   final _formKey = GlobalKey<FormState>();
   
-  // NÃO PRECISA MAIS DO CONTROLLER DE CÓDIGO, POIS É AUTOMÁTICO
+  // NOVOS CONTROLADORES
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
   final _pointsController = TextEditingController(text: "50");
   
   final ApiService _apiService = ApiService();
@@ -49,18 +51,23 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
     setState(() => _isLoading = true);
 
     try {
-      // CHAMADA ATUALIZADA: Só enviamos os pontos. O backend gera o código.
       await _apiService.createAdminGeneralCode(
         _token!,
-        // codeString: ... (REMOVIDO)
         pointsValue: int.parse(_pointsController.text),
+        title: _titleController.text,       // Envia Título
+        description: _descController.text,  // Envia Descrição
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Código gerado com sucesso!"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Código criado com sucesso!"), backgroundColor: Colors.green),
         );
-        // Atualiza a lista para o novo código aparecer no topo
+        
+        // Limpa tudo
+        _titleController.clear();
+        _descController.clear();
+        _pointsController.text = "50";
+        
         _refreshList();
       }
     } catch (e) {
@@ -74,7 +81,7 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
     }
   }
 
-  void _showQRCodeDialog(String code, String points) {
+  void _showQRCodeDialog(String code, String points, String? title) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -83,7 +90,14 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("Vale $points pontos (Geral)", style: const TextStyle(color: Colors.black54, fontSize: 14)),
+            // Mostra o Título no topo do Dialog
+            Text(
+              title?.toUpperCase() ?? "CÓDIGO GERAL", 
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+              textAlign: TextAlign.center
+            ),
+            const SizedBox(height: 8),
+            Text("Vale $points pontos", style: const TextStyle(color: Colors.black54, fontSize: 14)),
             const SizedBox(height: 20),
             SizedBox(
               height: 200, width: 200,
@@ -121,7 +135,7 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // --- ÁREA DE CRIAÇÃO (Formulário) ---
+          // --- ÁREA DE CRIAÇÃO ---
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -134,31 +148,53 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text("Gerar Pontos Gerais", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "O sistema criará um código aleatório seguro.", 
-                    style: TextStyle(color: Colors.grey, fontSize: 12)
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   
-                  // APENAS CAMPO DE PONTOS
+                  // CAMPO DE TÍTULO (NOVO)
+                  TextFormField(
+                    controller: _titleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: "Título (Ex: Ensaio Técnico)", 
+                      prefixIcon: Icon(Icons.title, color: AppColors.primaryYellow)
+                    ),
+                    validator: (v) => v!.isEmpty ? "Obrigatório" : null,
+                  ),
+                  
+                  const SizedBox(height: 10),
+
+                  // CAMPO DE DESCRIÇÃO (NOVO)
+                  TextFormField(
+                    controller: _descController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: "Descrição (Opcional)", 
+                      prefixIcon: Icon(Icons.description, color: Colors.grey)
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+                  
+                  // CAMPO DE PONTOS
                   TextFormField(
                     controller: _pointsController,
                     style: const TextStyle(color: Colors.white),
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Valor em Pontos", prefixIcon: Icon(Icons.star)),
+                    decoration: const InputDecoration(
+                      labelText: "Valor em Pontos", 
+                      prefixIcon: Icon(Icons.star, color: AppColors.primaryYellow)
+                    ),
                     validator: (v) => v!.isEmpty ? "Obrigatório" : null,
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   
-                  // BOTÃO DE GERAR
                   ElevatedButton.icon(
                     onPressed: _isLoading ? null : _createCode,
                     icon: _isLoading ? const SizedBox() : const Icon(Icons.auto_fix_high, color: Colors.black),
                     label: _isLoading 
                       ? const CircularProgressIndicator(color: Colors.black) 
-                      : const Text("GERAR CÓDIGO AUTOMÁTICO"),
+                      : const Text("GERAR CÓDIGO"),
                   ),
                 ],
               ),
@@ -186,16 +222,7 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                 final codes = snapshot.data ?? [];
                 
                 if (codes.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.qr_code_scanner, size: 60, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text("Nenhum código criado.", style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  );
+                  return const Center(child: Text("Nenhum código criado.", style: TextStyle(color: Colors.grey)));
                 }
 
                 return ListView.builder(
@@ -203,8 +230,15 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                   itemCount: codes.length,
                   itemBuilder: (context, index) {
                     final code = codes[index];
-                    final date = DateFormat('dd/MM/yy HH:mm').format(code.date.toLocal());
+                    // Formata a data (usa a data do evento se tiver, ou a de criação)
+                    final dateToShow = code.eventDate ?? code.date;
+                    final dateStr = DateFormat('dd/MM - HH:mm').format(dateToShow.toLocal());
                     
+                    // Decide o título principal: Usa o título do evento, se não tiver, usa o código
+                    final displayTitle = (code.title != null && code.title!.isNotEmpty) 
+                        ? code.title! 
+                        : code.codeString;
+
                     return Card(
                       color: AppColors.cardBackground,
                       margin: const EdgeInsets.only(bottom: 10),
@@ -213,8 +247,30 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                           backgroundColor: AppColors.primaryYellow,
                           child: Icon(Icons.qr_code, color: Colors.black),
                         ),
-                        title: Text(code.codeString, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        subtitle: Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        // TÍTULO DO EVENTO
+                        title: Text(
+                          displayTitle, 
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                        ),
+                        // SUBTITULO COM DATA E DESCRIÇÃO
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            if (code.description != null && code.description!.isNotEmpty)
+                               Padding(
+                                 padding: const EdgeInsets.only(top: 2),
+                                 child: Text(code.description!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                               ),
+                            // Mostra o código pequeno se o título for diferente
+                            if (displayTitle != code.codeString)
+                               Padding(
+                                 padding: const EdgeInsets.only(top: 2),
+                                 child: Text("Cód: ${code.codeString}", style: const TextStyle(color: Colors.amber, fontSize: 10)),
+                               ),
+                          ],
+                        ),
+                        isThreeLine: true,
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -222,7 +278,8 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                             const SizedBox(width: 8),
                             IconButton(
                               icon: const Icon(Icons.qr_code_2, color: Colors.white),
-                              onPressed: () => _showQRCodeDialog(code.codeString, code.points.toString()),
+                              // Passa o título para o diálogo do QR Code também
+                              onPressed: () => _showQRCodeDialog(code.codeString, code.points.toString(), displayTitle),
                             )
                           ],
                         ),

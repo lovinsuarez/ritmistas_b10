@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/pages/ranking_page.dart'; // Para usar RankingEntry
 
 class SectorRankingDetailPage extends StatefulWidget {
   final int sectorId;

@@ -124,6 +124,7 @@ class CheckIn(Base):
 
 class RedeemCode(Base):
     __tablename__ = "redeem_codes"
+    
     code_id = Column(Integer, primary_key=True, index=True)
     code_string = Column(String(50), unique=True, index=True, nullable=False)
     points_value = Column(Integer, nullable=False, default=10)
@@ -131,9 +132,15 @@ class RedeemCode(Base):
     is_redeemed = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
+
+    # --- NOVOS CAMPOS ---
+    title = Column(String(150), nullable=True) # Ex: "Ensaio Geral"
+    description = Column(String(255), nullable=True) # Ex: "Bônus por comparecimento"
+    
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) 
+
     sector = relationship("Sector", back_populates="redeem_codes")
     creator = relationship("User", back_populates="created_codes", foreign_keys=[created_by])
     assigned_user = relationship("User", back_populates="assigned_codes", foreign_keys=[assigned_user_id])

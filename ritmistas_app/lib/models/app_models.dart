@@ -2,12 +2,12 @@
 
 import 'package:intl/intl.dart';
 
-// --- RANKING (A classe que você estava procurando) ---
+// --- RANKING ---
 class RankingEntry {
   final int userId;
   final String username;
-  final String? nickname;   // Apelido
-  final String? profilePic; // Foto (URL ou Base64)
+  final String? nickname;   
+  final String? profilePic; 
   final int totalPoints;
 
   RankingEntry({
@@ -133,7 +133,7 @@ class Activity {
   final String type;
   final String? address;
   final bool isGeneral;
-  final String? checkinCode; // Código aleatório (V4.0)
+  final String? checkinCode; 
 
   Activity({
     required this.activityId,
@@ -160,7 +160,8 @@ class Activity {
   }
 }
 
-// --- DASHBOARD E CÓDIGOS ---
+// --- DASHBOARD E CÓDIGOS (CORREÇÃO AQUI) ---
+
 class CheckInDetail {
   final String title;
   final int points;
@@ -175,17 +176,35 @@ class CheckInDetail {
   );
 }
 
+// AQUI ESTÁ A CLASSE ATUALIZADA COM OS NOVOS CAMPOS:
 class CodeDetail {
   final String codeString;
   final int points;
   final DateTime date;
+  
+  // Campos novos V4.0
+  final String? title;       
+  final String? description; 
+  final DateTime? eventDate; 
 
-  CodeDetail({required this.codeString, required this.points, required this.date});
+  CodeDetail({
+    required this.codeString, 
+    required this.points, 
+    required this.date,
+    this.title,
+    this.description,
+    this.eventDate
+  });
 
   factory CodeDetail.fromJson(Map<String, dynamic> json) => CodeDetail(
     codeString: json['code_string'],
-    points: json['points_value'], // Mapeado corretamente do backend
+    points: json['points_value'],
     date: DateTime.parse(json['created_at']),
+    
+    // Mapeamento dos novos campos
+    title: json['title'],
+    description: json['description'],
+    eventDate: json['event_date'] != null ? DateTime.parse(json['event_date']) : null,
   );
 }
 

@@ -1,13 +1,12 @@
-// lib/pages/admin_master_badges_page.dart
 
 import 'package:flutter/material.dart' hide Badge;
 import 'package:ritmistas_app/main.dart';
-import 'package:ritmistas_app/services/api_service.dart';
+import 'package:ritmistas_app/services/api_service.dart' hide Badge;
 import 'package:ritmistas_app/models/app_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'dart:convert';
+import 'package:firebase_storage/firebase_storage.dart'; 
 
 class AdminMasterBadgesPage extends StatefulWidget {
   const AdminMasterBadgesPage({super.key});
@@ -41,32 +40,33 @@ class _AdminMasterBadgesPageState extends State<AdminMasterBadgesPage> {
     await _badgesFuture;
   }
 
-  // --- LÓGICA SEGURA DE CRIAÇÃO ---
-  Future<void> _handleCreateBadge(String name, String desc, String? base64Img) async {
-    // Mostra um aviso rápido que começou
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Criando insígnia..."), duration: Duration(seconds: 1)),
-    );
-
+  // --- UPLOAD FIREBASE ---
+  Future<String> _uploadBadgeImage(File file) async {
     try {
-      await _apiService.createBadge(
-        _token!, 
-        name, 
-        desc, 
-        base64Img ?? "" 
-      );
-      
-      // Se chegou aqui, deu certo. Atualiza a lista.
+      String fileName = 'badge_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      Reference ref = FirebaseStorage.instance.ref().child('badges').child(fileName);
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      throw Exception("Falha no upload: $e");
+    }
+  }
+
+  // --- CRIAR NO BANCO ---
+  Future<void> _createBadgeAction(String name, String desc, String iconUrl) async {
+    try {
+      await _apiService.createBadge(_token!, name, desc, iconUrl);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Sucesso! Insígnia criada."), backgroundColor: Colors.green)
+          const SnackBar(content: Text("Insígnia criada com sucesso!"), backgroundColor: Colors.green),
         );
         _refresh();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red)
+          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red),
         );
       }
     }
@@ -75,29 +75,28 @@ class _AdminMasterBadgesPageState extends State<AdminMasterBadgesPage> {
   void _showCreateBadgeDialog() {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    String? imageBase64;
+    
+    File? selectedImageFile;
+    bool isUploading = false;
     
     showDialog(
       context: context,
-      builder: (ctx) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          builder: (sbContext, setStateDialog) {
             
             Future<void> pickImage() async {
               try {
                 final ImagePicker picker = ImagePicker();
                 final XFile? image = await picker.pickImage(
                   source: ImageSource.gallery,
-                  // --- OTIMIZAÇÃO PARA NÃO CRASHAR ---
-                  maxWidth: 150,    // Ícone pequeno
-                  maxHeight: 150,   
-                  imageQuality: 30, // Baixa qualidade (suficiente para ícone)
+                  imageQuality: 80,
+                  maxWidth: 500,
                 );
                 
                 if (image != null) {
-                  final bytes = await File(image.path).readAsBytes();
                   setStateDialog(() {
-                    imageBase64 = "data:image/jpeg;base64,${base64Encode(bytes)}";
+                    selectedImageFile = File(image.path);
                   });
                 }
               } catch (e) {
@@ -107,66 +106,114 @@ class _AdminMasterBadgesPageState extends State<AdminMasterBadgesPage> {
 
             return AlertDialog(
               backgroundColor: AppColors.cardBackground,
-              title: const Text("Nova Insígnia", style: TextStyle(color: Colors.white)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text("Nova Insígnia", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // --- ÁREA DA IMAGEM (Sem campo de texto, só visual) ---
                     GestureDetector(
                       onTap: pickImage,
-                      child: Container(
-                        height: 80, width: 80,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.primaryYellow, width: 2),
-                          image: imageBase64 != null 
-                              ? DecorationImage(image: MemoryImage(base64Decode(imageBase64!.split(',')[1])), fit: BoxFit.cover)
-                              : null
-                        ),
-                        child: imageBase64 == null 
-                            ? const Icon(Icons.add_a_photo, color: Colors.white, size: 30)
-                            : null,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            height: 110, width: 110,
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.primaryYellow, width: 3),
+                              image: selectedImageFile != null 
+                                  ? DecorationImage(image: FileImage(selectedImageFile!), fit: BoxFit.cover)
+                                  : null
+                            ),
+                            child: selectedImageFile == null 
+                                ? const Icon(Icons.emoji_events, color: Colors.white24, size: 50)
+                                : null,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(color: AppColors.primaryYellow, shape: BoxShape.circle),
+                            child: const Icon(Icons.add_a_photo, size: 20, color: Colors.black),
+                          )
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: pickImage, 
-                      child: const Text("Escolher Imagem", style: TextStyle(color: AppColors.primaryYellow))
+                    const SizedBox(height: 12),
+                    const Text(
+                      "Toque para escolher o ícone", 
+                      style: TextStyle(color: Colors.grey, fontSize: 12)
                     ),
-                    const SizedBox(height: 16),
+                    
+                    const SizedBox(height: 24),
+                    
                     TextField(
                       controller: nameCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(labelText: "Nome (ex: MVP)"),
+                      decoration: InputDecoration(
+                        labelText: "Nome da Conquista",
+                        hintText: "Ex: MVP, Pontualidade...",
+                        filled: true,
+                        fillColor: Colors.black12,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.label, color: AppColors.primaryYellow)
+                      ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: descCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(labelText: "Descrição"),
+                      decoration: InputDecoration(
+                        labelText: "Descrição",
+                        hintText: "Ex: O melhor desempenho do mês",
+                        filled: true,
+                        fillColor: Colors.black12,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.description, color: AppColors.primaryYellow)
+                      ),
                     ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(dialogContext), 
+                  child: const Text("Cancelar", style: TextStyle(color: Colors.grey))
+                ),
+                
                 ElevatedButton(
-                  onPressed: () {
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryYellow,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  onPressed: isUploading ? null : () async {
                     if (nameCtrl.text.isEmpty) return;
                     
-                    // 1. Salva os dados em variáveis locais
-                    final n = nameCtrl.text;
-                    final d = descCtrl.text;
-                    final i = imageBase64;
+                    setStateDialog(() => isUploading = true);
 
-                    // 2. FECHA O DIÁLOGO IMEDIATAMENTE
-                    Navigator.pop(ctx);
+                    String finalUrl = "";
+                    
+                    try {
+                      if (selectedImageFile != null) {
+                         finalUrl = await _uploadBadgeImage(selectedImageFile!);
+                      }
 
-                    // 3. Chama a função de criar usando o contexto da PÁGINA (seguro)
-                    _handleCreateBadge(n, d, i);
+                      // Fecha e cria
+                      if (context.mounted) {
+                        Navigator.pop(dialogContext);
+                        _createBadgeAction(nameCtrl.text, descCtrl.text, finalUrl);
+                      }
+
+                    } catch (e) {
+                      setStateDialog(() => isUploading = false);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                    }
                   },
-                  child: const Text("Criar"),
+                  child: isUploading 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                      : const Text("Criar Insígnia"),
                 )
               ],
             );
@@ -193,7 +240,7 @@ class _AdminMasterBadgesPageState extends State<AdminMasterBadgesPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.military_tech_outlined, size: 60, color: Colors.grey),
+                  Icon(Icons.military_tech_outlined, size: 80, color: Colors.white12),
                   SizedBox(height: 16),
                   Text("Nenhuma insígnia criada.", style: TextStyle(color: Colors.grey)),
                 ],
@@ -202,61 +249,72 @@ class _AdminMasterBadgesPageState extends State<AdminMasterBadgesPage> {
           }
 
           return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Espaço bottom
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.8),
+            // Padding bottom 100 para não ficar atrás da NavigationBar
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2, 
+              crossAxisSpacing: 12, 
+              mainAxisSpacing: 12, 
+              childAspectRatio: 0.85,
+            ),
             itemCount: badges.length,
             itemBuilder: (context, index) {
               final badge = badges[index];
               
               ImageProvider? imageProvider;
               if (badge.iconUrl != null && badge.iconUrl!.isNotEmpty) {
-                if (badge.iconUrl!.startsWith("http")) {
-                  imageProvider = NetworkImage(badge.iconUrl!);
-                } else if (badge.iconUrl!.startsWith("data:image")) {
-                  try {
-                    imageProvider = MemoryImage(base64Decode(badge.iconUrl!.split(',')[1]));
-                  } catch(e) {}
-                }
+                imageProvider = NetworkImage(badge.iconUrl!);
               }
 
               return Card(
                 color: AppColors.cardBackground,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                         height: 60, width: 60,
-                         decoration: BoxDecoration(
-                           shape: BoxShape.circle,
-                           image: imageProvider != null ? DecorationImage(image: imageProvider, fit: BoxFit.cover) : null
-                         ),
-                         child: imageProvider == null ? const Icon(Icons.emoji_events, color: Colors.amber, size: 40) : null,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.white.withOpacity(0.05))
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                       height: 70, width: 70,
+                       decoration: BoxDecoration(
+                         shape: BoxShape.circle,
+                         border: Border.all(color: AppColors.primaryYellow, width: 2),
+                         image: imageProvider != null ? DecorationImage(image: imageProvider, fit: BoxFit.cover) : null,
+                         color: Colors.black38
+                       ),
+                       child: imageProvider == null ? const Icon(Icons.emoji_events, color: Colors.amber, size: 40) : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(
+                        badge.name.toUpperCase(), 
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), 
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis
                       ),
-                      const SizedBox(height: 12),
-                      Text(badge.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      const SizedBox(height: 4),
-                      Expanded(
-                        child: Text(badge.description ?? "", style: const TextStyle(color: Colors.grey, fontSize: 10), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },
           );
         },
       ),
+      
+      // --- CORREÇÃO DO BOTÃO (FLUTUANTE ACIMA DA BARRA) ---
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80.0),
+        padding: const EdgeInsets.only(bottom: 80.0), // Levanta o botão para não cobrir a nav bar
         child: FloatingActionButton.extended(
           onPressed: _showCreateBadgeDialog,
           label: const Text("Nova Insígnia"),
           icon: const Icon(Icons.add),
           backgroundColor: AppColors.primaryYellow,
           foregroundColor: Colors.black,
+          elevation: 4,
         ),
       ),
     );

@@ -265,20 +265,22 @@ class ApiService {
      throw Exception('Erro buscar users setor');
   }
 
-  Future<void> createAdminGeneralCode(String token, {required int pointsValue}) async {
+  Future<void> createAdminGeneralCode(String token, {required int pointsValue, required String title, String? description}) async {
     final url = Uri.parse('$_baseUrl/admin-master/codes/general');
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json", "Authorization": "Bearer $token"},
       body: jsonEncode({
-        // Não enviamos mais "code_string", o backend gera
+        // code_string é gerado no backend
         "points_value": pointsValue,
-        "is_general": true
+        "is_general": true,
+        "title": title,             // Envia título
+        "description": description  // Envia descrição
       }),
     );
     
     if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception('Falha ao criar código geral');
+      throw Exception('Falha ao criar código geral (Erro ${response.statusCode})');
     }
   }
 

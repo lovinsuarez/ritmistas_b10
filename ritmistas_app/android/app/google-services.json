@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "306431187598",
+    "project_id": "app-pontos-dev",
+    "storage_bucket": "app-pontos-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306431187598:android:f10763c6226c3f5c3d07df",
+        "android_client_info": {
+          "package_name": "com.example.ritmistas_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "306431187598-0s9dlndonjdprs41krohahbmd06tb2pq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbNnW0zRTC5FpYBi7oza5T_dTuUWe9W2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "306431187598-0s9dlndonjdprs41krohahbmd06tb2pq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

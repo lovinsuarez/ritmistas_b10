@@ -77,8 +77,12 @@ class AddBudgetRequest(BaseConfig):
     points: int
 
 class CodeCreateGeneral(BaseConfig):
+    code_string: str
     points_value: int = 10
     is_general: bool = False
+    # NOVOS CAMPOS
+    title: str | None = None
+    description: str | None = None
 class CodeCreateUnique(BaseConfig):
     code_string: str
     points_value: int = 10
@@ -136,6 +140,9 @@ class CodeDetail(BaseConfig):
     points_value: int
     created_at: datetime
     is_general: bool = False
+    # NOVOS CAMPOS
+    title: str | None = None
+    description: str | None = None
 
 class UserDashboard(BaseConfig):
     user_id: int

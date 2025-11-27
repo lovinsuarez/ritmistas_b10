@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/main.dart'; // AppColors
+
 
 class AdminCriarCodigoPage extends StatefulWidget {
   const AdminCriarCodigoPage({super.key});

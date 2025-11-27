@@ -26,7 +26,9 @@ dependencies:
   clipboard: ^2.0.1
   curved_navigation_bar: ^1.0.6
   mobile_scanner: ^6.0.0
-  image_picker: ^1.1.2
+  firebase_core: ^4.2.1
+  firebase_storage: ^13.0.4
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:

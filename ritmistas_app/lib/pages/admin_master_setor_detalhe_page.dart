@@ -1,10 +1,7 @@
-// lib/pages/admin_master_setor_detalhe_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// Importamos a página de ranking para reutilizar o modelo 'RankingEntry'
-import 'package:ritmistas_app/pages/ranking_page.dart';
+
 
 class AdminMasterSetorDetalhePage extends StatefulWidget {
   // Recebe o setor que foi clicado

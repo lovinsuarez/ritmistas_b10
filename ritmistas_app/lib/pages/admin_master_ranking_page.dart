@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/pages/ranking_page.dart'; // Reutiliza RankingEntry e layout
 
 class AdminMasterRankingPage extends StatefulWidget {
   const AdminMasterRankingPage({super.key});

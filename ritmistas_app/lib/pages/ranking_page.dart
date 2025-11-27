@@ -5,7 +5,6 @@ import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:ritmistas_app/models/app_models.dart'; // <--- IMPORTANTE: Traz os modelos
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart'; // Para navegar ao clicar no setor
 import 'dart:convert'; // Para decodificar a foto
 
 class RankingPage extends StatefulWidget {

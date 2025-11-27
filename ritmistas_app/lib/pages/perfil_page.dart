@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
-import 'package:ritmistas_app/models/app_models.dart'; // Importa os modelos
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart';
 import 'package:ritmistas_app/pages/editar_perfil_page.dart';
@@ -256,6 +255,7 @@ class _PerfilPageState extends State<PerfilPage> {
                         const SizedBox(height: 60), // Espaço para o avatar que desceu
 
                         // 2. Informações do Usuário
+                        
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Column(
@@ -438,33 +438,92 @@ class _PerfilPageState extends State<PerfilPage> {
                         if (inviteCode != null) ...[
                           const SizedBox(height: 30),
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             decoration: BoxDecoration(
                               color: AppColors.primaryYellow,
-                              borderRadius: BorderRadius.circular(12)
-                            ),
-                            child: Column(
-                              children: [
-                                const Text("CONVITE DO SETOR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(inviteCode, style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
-                                    const SizedBox(width: 10),
-                                    InkWell(
-                                      onTap: () {
-                                        Clipboard.setData(ClipboardData(text: inviteCode));
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.black));
-                                      },
-                                      child: const Icon(Icons.copy, color: Colors.black),
-                                    )
-                                  ],
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryYellow.withOpacity(0.4),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 )
                               ],
                             ),
-                          )
-                        ]
+                            child: Column(
+                              children: [
+                                const Text(
+                                  "CÓDIGO DE CONVITE DO SETOR",
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                
+                                // Container interno para o código + botão
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          inviteCode,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 18, // Fonte um pouco menor para caber códigos longos
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis, // Reticências se for muito grande
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      // Botão de Copiar Redondo e Bonito
+                                      Material(
+                                        color: Colors.black, // Botão preto
+                                        shape: const CircleBorder(),
+                                        child: InkWell(
+                                          customBorder: const CircleBorder(),
+                                          onTap: () {
+                                            Clipboard.setData(ClipboardData(text: inviteCode));
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Código copiado para a área de transferência!'),
+                                                backgroundColor: Colors.green,
+                                                duration: Duration(seconds: 2),
+                                              )
+                                            );
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Icon(Icons.copy, color: AppColors.primaryYellow, size: 20),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "Envie para novos membros entrarem no seu time.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.black54, fontSize: 11),
+                                )
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                       ],
                     ),
                   ),

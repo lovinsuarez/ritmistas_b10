@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ritmistas_app/auth_check.dart';
 
 class AppColors {
   static const Color background = Color(0xFF121212); // Preto fundo
@@ -348,7 +347,9 @@ class _LoginPageState extends State<LoginPage> {
                         : Text(btnText),
                   ),
                   const SizedBox(height: 24),
+                  
                   footer,
+                  
                 ],
               ),
             ),

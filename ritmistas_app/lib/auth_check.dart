@@ -1,7 +1,6 @@
 // lib/auth_check.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/main.dart'; // Para AppColors
 import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/pages/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';

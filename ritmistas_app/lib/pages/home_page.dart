@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:ritmistas_app/main.dart'; // Esconde para não conflitar
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_usuarios_page.dart';
@@ -17,7 +16,7 @@ import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
 import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
-import 'package:ritmistas_app/pages/scan_page.dart';
+
 
 class AppColors {
   static const Color background = Color(0xFF121212); // Preto fundo
