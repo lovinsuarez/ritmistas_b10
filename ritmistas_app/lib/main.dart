@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// ADICIONE ESTA LINHA:
+import 'package:ritmistas_app/auth_check.dart';
 import 'package:ritmistas_app/pages/login_page.dart';
 // --- 1. DEFINIÇÃO DE CORES E TEMA ---
 
@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
       theme: appTheme,
       debugShowCheckedModeBanner: false,
       // ROTA INICIAL
-      initialRoute: '/login',
+      home: const AuthCheck(),
       // DEFINIÇÃO DAS ROTAS
       routes: {
         '/login': (context) => const LoginPage(),
