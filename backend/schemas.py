@@ -77,7 +77,6 @@ class AddBudgetRequest(BaseConfig):
     points: int
 
 class CodeCreateGeneral(BaseConfig):
-    # code_string removido (gerado auto)
     points_value: int = 10
     is_general: bool = False
     title: str | None = None
@@ -137,10 +136,9 @@ class CheckInDetail(BaseConfig):
 
 class CodeDetail(BaseConfig):
     code_string: str
-    points_value: int # Nome corrigido (era points)
-    created_at: datetime # Nome corrigido (era date)
+    points_value: int
+    created_at: datetime
     is_general: bool = False
-    # Novos campos de leitura
     title: str | None = None
     description: str | None = None
     event_date: datetime | None = None
