@@ -49,16 +49,14 @@ class _HomePageState extends State<HomePage> {
 
   // --- CORREÇÃO DEFINITIVA DO CRASH AO SAIR ---
   Future<void> _handleLogout() async {
-    // 1. Captura o Navigator IMEDIATAMENTE (antes de qualquer await)
-    // Isso garante que temos a referência para mudar a tela, mesmo se o widget for desmontado.
-    // rootNavigator: true garante que pegamos o controlador principal do App.
+
     final navigator = Navigator.of(context, rootNavigator: true);
-    
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear(); // Limpa token e role
-
-    // 2. Usa a referência segura para navegar para o Login
-    navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
