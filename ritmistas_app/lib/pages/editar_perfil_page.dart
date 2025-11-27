@@ -1,11 +1,12 @@
-import 'dart:io';
+// lib/pages/editar_perfil_page.dart
+
+import 'dart:typed_data'; // Importante para Web
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// IMPORTANTE: Importa o Storage
 import 'package:firebase_storage/firebase_storage.dart';
 
 class EditarPerfilPage extends StatefulWidget {
@@ -27,10 +28,9 @@ class EditarPerfilPage extends StatefulWidget {
 class _EditarPerfilPageState extends State<EditarPerfilPage> {
   final _formKey = GlobalKey<FormState>();
   final _nicknameController = TextEditingController();
-  final _photoUrlController = TextEditingController();
   
-  // Agora guardamos o ARQUIVO, não a string base64
-  File? _selectedImageFile;
+  // Mudança: Usamos bytes para compatibilidade Web
+  Uint8List? _imageBytes;
   
   DateTime? _selectedDate;
   bool _isLoading = false;
@@ -41,29 +41,25 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
   void initState() {
     super.initState();
     if (widget.currentNickname != null) _nicknameController.text = widget.currentNickname!;
-    // Se já tem URL, põe no campo (mas o usuário pode não ver se escolher arquivo)
-    if (widget.currentPhotoUrl != null && widget.currentPhotoUrl!.startsWith('http')) {
-      _photoUrlController.text = widget.currentPhotoUrl!;
-    }
     if (widget.currentBirthDate != null) {
       try { _selectedDate = DateTime.parse(widget.currentBirthDate!); } catch (e) {}
     }
   }
 
-  // 1. Escolher Imagem (Apenas guarda o arquivo local)
+  // 1. Escolher Imagem (Compatível com Web)
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 70, // Boa qualidade
-        maxWidth: 1000,
+        imageQuality: 70, 
+        maxWidth: 800,
       );
       
       if (image != null) {
+        // Lê os bytes imediatamente
+        final bytes = await image.readAsBytes();
         setState(() {
-          _selectedImageFile = File(image.path);
-          // Limpa o campo de texto para dar prioridade à imagem nova
-          _photoUrlController.clear();
+          _imageBytes = bytes;
         });
       }
     } catch (e) {
@@ -71,24 +67,17 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     }
   }
 
-  // 2. Upload para o Firebase (Retorna a URL)
-  Future<String> _uploadImageToFirebase(File file) async {
+  // 2. Upload usando Bytes (Funciona na Web)
+  Future<String> _uploadImageToFirebase(Uint8List data) async {
     try {
-      // Cria um nome único: perfil_TIMESTAMP.jpg
       String fileName = 'perfil_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      
-      // Referência no Storage (Pasta 'avatars')
       Reference ref = FirebaseStorage.instance.ref().child('avatars').child(fileName);
       
-      // Faz o Upload
-      UploadTask uploadTask = ref.putFile(file);
+      // CORREÇÃO: putData em vez de putFile
+      UploadTask uploadTask = ref.putData(data, SettableMetadata(contentType: 'image/jpeg'));
       
-      // Espera terminar
       TaskSnapshot snapshot = await uploadTask;
-      
-      // Pega a URL pública
-      String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
+      return await snapshot.ref.getDownloadURL();
     } catch (e) {
       throw Exception("Falha no upload da imagem: $e");
     }
@@ -105,17 +94,14 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
       String? finalPhotoUrl;
 
-      // SE O USUÁRIO ESCOLHEU UMA FOTO NOVA DO CELULAR:
-      if (_selectedImageFile != null) {
-        // Faz o upload primeiro
-        finalPhotoUrl = await _uploadImageToFirebase(_selectedImageFile!);
-      } 
-      // SE NÃO, USA O QUE ESTÁ NO CAMPO DE TEXTO (URL ANTIGA OU NOVA COLADA)
-      else if (_photoUrlController.text.isNotEmpty) {
-        finalPhotoUrl = _photoUrlController.text;
+      // Se escolheu imagem nova, faz upload
+      if (_imageBytes != null) {
+        finalPhotoUrl = await _uploadImageToFirebase(_imageBytes!);
+      } else {
+        // Mantém a antiga se não mudou
+        finalPhotoUrl = widget.currentPhotoUrl;
       }
 
-      // Atualiza no Backend com a URL final
       await _apiService.updateProfile(
         token,
         nickname: _nicknameController.text.isEmpty ? null : _nicknameController.text,
@@ -136,13 +122,12 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Helper para mostrar o preview
     ImageProvider? getPreview() {
-      if (_selectedImageFile != null) {
-        return FileImage(_selectedImageFile!); // Mostra o arquivo local
+      if (_imageBytes != null) {
+        return MemoryImage(_imageBytes!); // Mostra bytes locais
       }
-      if (_photoUrlController.text.isNotEmpty) {
-        return NetworkImage(_photoUrlController.text); // Mostra a URL antiga
+      if (widget.currentPhotoUrl != null) {
+        return NetworkImage(widget.currentPhotoUrl!); // Mostra URL antiga
       }
       return null;
     }
@@ -177,24 +162,15 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              TextButton(onPressed: _pickImage, child: const Text("Escolher da Galeria")),
+              TextButton(onPressed: _pickImage, child: const Text("Alterar Foto")),
               
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
               TextFormField(
                 controller: _nicknameController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(labelText: "Apelido", prefixIcon: Icon(Icons.badge)),
               ),
-              const SizedBox(height: 16),
-              
-              // Campo URL (Opcional, caso queira esconder pode usar Visibility)
-              TextFormField(
-                controller: _photoUrlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: "Ou cole uma URL (Link)", prefixIcon: Icon(Icons.link)),
-              ),
-
               const SizedBox(height: 16),
               InkWell(
                 onTap: () async {
@@ -204,16 +180,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                       firstDate: DateTime(1950), 
                       lastDate: DateTime.now(),
                       builder: (context, child) {
-                        return Theme(
-                          data: ThemeData.dark().copyWith(
-                            colorScheme: const ColorScheme.dark(
-                              primary: AppColors.primaryYellow,
-                              onPrimary: Colors.black,
-                              surface: AppColors.cardBackground,
-                            ),
-                          ),
-                          child: child!,
-                        );
+                        return Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: AppColors.primaryYellow, onPrimary: Colors.black, surface: AppColors.cardBackground)), child: child!);
                       }
                   );
                   if (d != null) setState(() => _selectedDate = d);
@@ -229,7 +196,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _saveProfile,
                   child: _isLoading 
-                      ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text("ENVIANDO... "), SizedBox(width: 10, height: 10, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))])
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
                       : const Text("SALVAR ALTERAÇÕES"),
                 ),
               ),

@@ -1,71 +1,102 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:ritmistas_app/main.dart';
+import 'package:ritmistas_app/main.dart'; // AppColors
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
+
   @override
   State<ScanPage> createState() => _ScanPageState();
 }
 
 class _ScanPageState extends State<ScanPage> {
   final ApiService _apiService = ApiService();
-  // Na versão 5.2.3, o controller funciona assim:
   final MobileScannerController controller = MobileScannerController();
-  // Estado local da lanterna (compatível com várias versões do pacote)
-  final ValueNotifier<bool> _torchOn = ValueNotifier<bool>(false);
   bool _isProcessing = false;
+  bool _isTorchOn = false;
 
   @override
   void dispose() {
     controller.dispose();
-    _torchOn.dispose();
     super.dispose();
   }
 
   void _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
+
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       if (barcode.rawValue != null) {
         setState(() => _isProcessing = true);
-        await _processCheckIn(barcode.rawValue!);
+        // Chama a função que tenta os dois tipos
+        await _processCode(barcode.rawValue!); 
         break;
       }
     }
   }
 
-  Future<void> _processCheckIn(String activityId) async {
+  // --- LÓGICA INTELIGENTE: Tenta Geral, se falhar tenta Setor ---
+  Future<void> _processCode(String code) async {
     try {
       showDialog(
-        context: context, barrierDismissible: false,
+        context: context,
+        barrierDismissible: false,
         builder: (ctx) => const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow)),
       );
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       if (token == null) throw Exception("Não autenticado.");
 
-      // Tenta checkin direto (String)
-      final message = await _apiService.checkIn(activityId, token);
-      
+      String message = "";
+
+      try {
+        // 1. Tenta como Código GERAL (Admin Master / Bônus)
+        message = await _apiService.redeemCode(code, token);
+      } catch (e) {
+        // 2. Se falhar, tenta como ATIVIDADE (Líder)
+        try {
+           message = await _apiService.checkIn(code, token);
+        } catch (e2) {
+           // 3. Se falhar nos dois, é inválido
+           throw Exception("Código inválido ou não encontrado.");
+        }
+      }
+
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Fecha loading
+        
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: AppColors.cardBackground,
             title: const Text("Sucesso!", style: TextStyle(color: Colors.green)),
             content: Text(message, style: const TextStyle(color: Colors.white)),
-            actions: [TextButton(onPressed: () { Navigator.pop(ctx); Navigator.pop(context); }, child: const Text("OK"))],
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx); // Fecha alerta
+                  Navigator.pop(context); // Fecha câmera
+                },
+                child: const Text("OK"),
+              )
+            ],
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"), backgroundColor: Colors.red));
+        Navigator.pop(context); // Fecha loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) setState(() => _isProcessing = false);
       }
@@ -81,27 +112,16 @@ class _ScanPageState extends State<ScanPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // BOTÃO DA LANTERNA (compatível)
           IconButton(
-            icon: ValueListenableBuilder<bool>(
-              valueListenable: _torchOn,
-              builder: (context, isOn, child) {
-                return isOn
-                    ? const Icon(Icons.flash_on, color: AppColors.primaryYellow)
-                    : const Icon(Icons.flash_off, color: Colors.grey);
-              },
+            icon: Icon(
+              _isTorchOn ? Icons.flash_on : Icons.flash_off,
+              color: _isTorchOn ? AppColors.primaryYellow : Colors.grey,
             ),
             onPressed: () async {
-              try {
-                await controller.toggleTorch();
-                _torchOn.value = !_torchOn.value;
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao alternar lanterna: $e')),
-                  );
-                }
-              }
+              await controller.toggleTorch();
+              setState(() {
+                _isTorchOn = !_isTorchOn;
+              });
             },
           ),
         ],
@@ -111,7 +131,8 @@ class _ScanPageState extends State<ScanPage> {
           MobileScanner(controller: controller, onDetect: _onDetect),
           Center(
             child: Container(
-              width: 250, height: 250,
+              width: 250,
+              height: 250,
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.primaryYellow, width: 4),
                 borderRadius: BorderRadius.circular(20),
