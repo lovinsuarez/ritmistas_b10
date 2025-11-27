@@ -1,3 +1,4 @@
+# backend/models.py
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint, UUID, Table
@@ -39,14 +40,10 @@ class SystemInvite(Base):
 
 class Badge(Base):
     __tablename__ = "badges"
-    
     badge_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     description = Column(String(200))
-    
-    # CORREÇÃO: Removido o limite (500) para aceitar Base64
-    icon_url = Column(String, nullable=True) 
-    
+    icon_url = Column(String) # Sem limite para Base64 ou URL longa
     created_at = Column(DateTime, server_default=func.now())
     awards = relationship("UserBadge", back_populates="badge")
 
@@ -103,7 +100,7 @@ class Activity(Base):
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
     
-    # CAMPO QUE FALTAVA:
+    # CAMPO CRÍTICO PARA O SCANNER
     checkin_code = Column(String(20), unique=True, nullable=True) 
 
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
@@ -124,7 +121,6 @@ class CheckIn(Base):
 
 class RedeemCode(Base):
     __tablename__ = "redeem_codes"
-    
     code_id = Column(Integer, primary_key=True, index=True)
     code_string = Column(String(50), unique=True, index=True, nullable=False)
     points_value = Column(Integer, nullable=False, default=10)
@@ -133,14 +129,15 @@ class RedeemCode(Base):
     created_at = Column(DateTime, server_default=func.now())
     is_general = Column(Boolean, default=False) 
 
-    # --- NOVOS CAMPOS ---
-    title = Column(String(150), nullable=True) # Ex: "Ensaio Geral"
-    description = Column(String(255), nullable=True) # Ex: "Bônus por comparecimento"
-    
+    # --- CAMPOS CRÍTICOS QUE FALTAVAM ---
+    title = Column(String(150), nullable=True) 
+    description = Column(String(255), nullable=True)
+    event_date = Column(DateTime, nullable=True)
+    # ------------------------------------
+
     sector_id = Column(Integer, ForeignKey("sectors.sector_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False) 
     assigned_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True) 
-
     sector = relationship("Sector", back_populates="redeem_codes")
     creator = relationship("User", back_populates="created_codes", foreign_keys=[created_by])
     assigned_user = relationship("User", back_populates="assigned_codes", foreign_keys=[assigned_user_id])

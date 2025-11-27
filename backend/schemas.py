@@ -7,10 +7,17 @@ from models import UserRole, UserStatus
 class BaseConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
+# Token Data (Login Fix)
+class TokenData(BaseConfig):
+    email: str | None = None
+class Token(BaseConfig):
+    access_token: str
+    token_type: str
+
+# Classes Básicas
 class SystemInvite(BaseConfig):
     code: str
     is_used: bool
-
 class BadgeBase(BaseConfig):
     name: str
     description: str | None = None
@@ -22,32 +29,23 @@ class UserBadge(BaseConfig):
     badge: Badge
     awarded_at: datetime
 
-class Token(BaseConfig):
-    access_token: str
-    token_type: str
-class TokenData(BaseConfig):
-    email: str | None = None
-
+# User
 class UserBase(BaseConfig):
     email: EmailStr
     username: str
     nickname: str | None = None
-
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 class UserRegister(UserCreate): 
     invite_code: str 
-
 class UserUpdateProfile(BaseConfig):
     nickname: str | None = None
     birth_date: date | None = None
     profile_pic: str | None = None
-
 class UserSectorPoints(BaseConfig):
     sector_id: int
     sector_name: str
     points: int
-
 class User(UserBase):
     user_id: int
     role: UserRole 
@@ -59,6 +57,7 @@ class User(UserBase):
     total_global_points: int | None = None
     badges: list[UserBadge] = []
 
+# Outros
 class Sector(BaseConfig):
     sector_id: int
     name: str
@@ -75,6 +74,7 @@ class AddBudgetRequest(BaseConfig):
     lider_id: int
     points: int
 
+# Pontos Gerais (Com Título)
 class CodeCreateGeneral(BaseConfig):
     points_value: int = 10
     is_general: bool = False
@@ -88,8 +88,7 @@ class CodeCreateUnique(BaseConfig):
     assigned_user_id: int
     is_general: bool = False
 
-class CheckInRequest(BaseConfig): 
-    activity_code: str 
+class CheckInRequest(BaseConfig): activity_code: str 
 
 class RankingEntry(BaseConfig):
     user_id: int
@@ -97,7 +96,6 @@ class RankingEntry(BaseConfig):
     nickname: str | None = None
     profile_pic: str | None = None
     total_points: int
-
 class RankingResponse(BaseConfig):
     my_user_id: int
     ranking: list[RankingEntry]
@@ -114,7 +112,6 @@ class ActivityCreate(BaseConfig):
     activity_date: datetime 
     points_value: int = Field(..., gt=0) 
     is_general: bool = False
-
 class Activity(ActivityCreate): 
     activity_id: int
     created_by: int
@@ -132,11 +129,11 @@ class CheckInDetail(BaseConfig):
     date: datetime
     is_general: bool = False
 
-# CORRIGIDO: NOMES DEVEM BATER COM O BANCO DE DADOS
+# Lista de Códigos (Nomes Corrigidos)
 class CodeDetail(BaseConfig):
     code_string: str
-    points_value: int # <--- ERA points, MUDOU PARA points_value
-    created_at: datetime # <--- ERA date, MUDOU PARA created_at
+    points_value: int
+    created_at: datetime
     is_general: bool = False
     title: str | None = None
     description: str | None = None
