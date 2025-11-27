@@ -5,9 +5,11 @@ WORKDIR /app
 
 # Copia configurações
 COPY pubspec.yaml ./
+# COPIE TAMBÉM O LOCKFILE PARA GARANTIR QUE ELE ESTEJA LÁ PARA SER DELETADO
+COPY pubspec.lock ./
 
 # Remove trava de versão do Windows
-RUN rm -f pubspec.lock
+RUN rm pubspec.lock
 
 # Baixa dependências
 RUN flutter pub get
