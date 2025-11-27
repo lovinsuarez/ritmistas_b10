@@ -77,12 +77,12 @@ class AddBudgetRequest(BaseConfig):
     points: int
 
 class CodeCreateGeneral(BaseConfig):
-    code_string: str
+    # code_string removido (gerado auto)
     points_value: int = 10
     is_general: bool = False
-    # NOVOS CAMPOS
     title: str | None = None
     description: str | None = None
+    event_date: datetime | None = None
 class CodeCreateUnique(BaseConfig):
     code_string: str
     points_value: int = 10
@@ -137,12 +137,13 @@ class CheckInDetail(BaseConfig):
 
 class CodeDetail(BaseConfig):
     code_string: str
-    points_value: int
-    created_at: datetime
+    points_value: int # Nome corrigido (era points)
+    created_at: datetime # Nome corrigido (era date)
     is_general: bool = False
-    # NOVOS CAMPOS
+    # Novos campos de leitura
     title: str | None = None
     description: str | None = None
+    event_date: datetime | None = None
 
 class UserDashboard(BaseConfig):
     user_id: int

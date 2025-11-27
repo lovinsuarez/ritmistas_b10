@@ -116,6 +116,7 @@ def create_general_code(db: Session, code_data: schemas.CodeCreateGeneral, creat
     is_general = (creator.role == models.UserRole.admin) or code_data.is_general
     sector_id = creator.led_sector.sector_id if creator.led_sector else None
     
+    # Gera código de 8 dígitos
     code = generate_short_code(8)
 
     new_code = models.RedeemCode(
@@ -126,9 +127,10 @@ def create_general_code(db: Session, code_data: schemas.CodeCreateGeneral, creat
         created_by=creator.user_id,
         is_general=is_general,
         
-        # SALVANDO OS NOVOS DADOS
+        # CORREÇÃO: Salvando os campos extras
         title=code_data.title,
-        description=code_data.description
+        description=code_data.description,
+        event_date=code_data.event_date
     )
     db.add(new_code)
     db.commit()
