@@ -4,7 +4,6 @@ from datetime import datetime, date
 import uuid
 from models import UserRole, UserStatus
 
-# Configuração Global
 class BaseConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
@@ -82,13 +81,13 @@ class CodeCreateGeneral(BaseConfig):
     title: str | None = None
     description: str | None = None
     event_date: datetime | None = None
+
 class CodeCreateUnique(BaseConfig):
     code_string: str
     points_value: int = 10
     assigned_user_id: int
     is_general: bool = False
 
-# MUDANÇA: Agora o CheckIn recebe um código string, não um ID int
 class CheckInRequest(BaseConfig): 
     activity_code: str 
 
@@ -120,7 +119,6 @@ class Activity(ActivityCreate):
     activity_id: int
     created_by: int
     sector_id: int | None
-    # CAMPO QUE FALTAVA:
     checkin_code: str | None = None
 
 class UserAdminView(UserBase): 
@@ -134,10 +132,11 @@ class CheckInDetail(BaseConfig):
     date: datetime
     is_general: bool = False
 
+# CORRIGIDO: NOMES DEVEM BATER COM O BANCO DE DADOS
 class CodeDetail(BaseConfig):
     code_string: str
-    points_value: int
-    created_at: datetime
+    points_value: int # <--- ERA points, MUDOU PARA points_value
+    created_at: datetime # <--- ERA date, MUDOU PARA created_at
     is_general: bool = False
     title: str | None = None
     description: str | None = None
@@ -149,10 +148,8 @@ class UserDashboard(BaseConfig):
     total_points: int
     checkins: list[CheckInDetail]
     redeemed_codes: list[CodeDetail]
-
 class UserResponse(User): 
     invite_code: uuid.UUID | None = None 
-
 class AuditLogItem(BaseConfig):
     timestamp: datetime
     type: str 
