@@ -230,8 +230,8 @@ class _AdminMasterPontosPageState extends State<AdminMasterPontosPage> {
                   itemCount: codes.length,
                   itemBuilder: (context, index) {
                     final code = codes[index];
-                    // Formata a data (usa a data do evento se tiver, ou a de criação)
-                    final dateToShow = code.eventDate ?? code.date;
+                    // Formata a data (usa a data de criação)
+                    final dateToShow = code.date;
                     final dateStr = DateFormat('dd/MM - HH:mm').format(dateToShow.toLocal());
                     
                     // Decide o título principal: Usa o título do evento, se não tiver, usa o código

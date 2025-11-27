@@ -18,7 +18,7 @@ class _AdminCriarCodigoPageState extends State<AdminCriarCodigoPage> {
   final _codeStringController = TextEditingController();
   final _pointsController = TextEditingController(text: '10');
 
-  Future<void> _handleSubmit() async {
+Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
@@ -27,7 +27,8 @@ class _AdminCriarCodigoPageState extends State<AdminCriarCodigoPage> {
       final token = prefs.getString('access_token');
       if (token == null) throw Exception("Não autenticado.");
 
-      await _apiService.createGeneralCode(
+      // CORREÇÃO: Usa a função específica do Admin Master (que você já tem no api_service)
+      await _apiService.createAdminGeneralCode(
         token,
         codeString: _codeStringController.text,
         pointsValue: int.parse(_pointsController.text),
@@ -51,7 +52,6 @@ class _AdminCriarCodigoPageState extends State<AdminCriarCodigoPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

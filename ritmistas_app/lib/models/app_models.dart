@@ -1,6 +1,6 @@
 // lib/models/app_models.dart
 
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart'; // removido pois não está em uso
 
 // --- RANKING ---
 class RankingEntry {
@@ -198,10 +198,11 @@ class CodeDetail {
 
   factory CodeDetail.fromJson(Map<String, dynamic> json) => CodeDetail(
     codeString: json['code_string'],
-    points: json['points_value'],
-    date: DateTime.parse(json['created_at']),
+    // MAPEAMENTO CORRIGIDO:
+    points: json['points_value'], // Lê 'points_value' do JSON e põe em 'points'
+    date: DateTime.parse(json['created_at']), // Lê 'created_at' e põe em 'date'
     
-    // Mapeamento dos novos campos
+    // Novos campos
     title: json['title'],
     description: json['description'],
     eventDate: json['event_date'] != null ? DateTime.parse(json['event_date']) : null,

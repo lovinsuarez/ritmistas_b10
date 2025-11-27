@@ -5,6 +5,7 @@ import 'package:ritmistas_app/auth_check.dart';
 import 'package:ritmistas_app/pages/login.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Necessário para inicializar plugins antes do app
   
