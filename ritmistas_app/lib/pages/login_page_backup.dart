@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/theme.dart'; // Importe suas cores (definidas em theme.dart)
 
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
+class LoginPage_backup extends StatelessWidget {
+  const LoginPage_backup({super.key});
 
   @override
   Widget build(BuildContext context) {

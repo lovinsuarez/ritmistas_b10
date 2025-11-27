@@ -3,9 +3,16 @@
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart'; // Para AppColors
 import 'package:ritmistas_app/pages/home_page.dart';
-import 'package:ritmistas_app/pages/login_page.dart' hide LoginPage;
+import 'package:ritmistas_app/pages/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class AppColors {
+  static const Color background = Color(0xFF121212); // Preto fundo
+  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
+  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
+  static const Color textWhite = Colors.white;
+  static const Color textGrey = Colors.grey;
+}
 class AuthCheck extends StatefulWidget {
   const AuthCheck({super.key});
 

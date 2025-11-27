@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/services/api_service.dart';
-import 'package:ritmistas_app/models/app_models.dart';
+import 'package:ritmistas_app/models/app_models.dart'; // Importa os modelos
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ritmistas_app/pages/sector_ranking_detail_page.dart';
 import 'package:ritmistas_app/pages/editar_perfil_page.dart';
-import 'dart:convert';
-import 'package:intl/intl.dart'; // Para formatar a data da conquista
+import 'dart:convert'; // Para decodificar Base64
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
@@ -57,28 +56,26 @@ class _PerfilPageState extends State<PerfilPage> {
   void _showJoinSectorDialog() {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          title: const Text("Entrar em Novo Setor", style: TextStyle(color: Colors.white)),
-          content: TextField(
-            controller: _codeController,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(labelText: "Código de Convite", border: OutlineInputBorder(), prefixIcon: Icon(Icons.vpn_key, color: AppColors.primaryYellow)),
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text("Entrar em Novo Setor", style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: _codeController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(labelText: "Código", border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              if (_codeController.text.isEmpty) return;
+              Navigator.pop(context);
+              await _handleJoinSector(_codeController.text);
+            },
+            child: const Text("Entrar"),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
-            ElevatedButton(
-              onPressed: () async {
-                if (_codeController.text.isEmpty) return;
-                Navigator.pop(context);
-                await _handleJoinSector(_codeController.text);
-              },
-              child: const Text("Entrar"),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -87,7 +84,7 @@ class _PerfilPageState extends State<PerfilPage> {
     try {
       await _apiService.joinSector(_token!, code);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sucesso!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Entrou no setor!"), backgroundColor: Colors.green));
         _codeController.clear();
         _refresh();
       }
@@ -110,74 +107,33 @@ class _PerfilPageState extends State<PerfilPage> {
     return null;
   }
 
-  // --- NOVO: MOSTRAR DETALHES DA INSÍGNIA ---
+  // --- DIÁLOGO DE INSÍGNIA ---
   void _showBadgeDetails(dynamic badgeData) {
-    final badge = badgeData['badge']; // Dados da insígnia
-    final String dateStr = badgeData['awarded_at']; // Data que ganhou
-    final DateTime date = DateTime.parse(dateStr);
-    final String formattedDate = DateFormat('dd/MM/yyyy').format(date);
-
+    final b = badgeData['badge'];
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.grey[900]!, Colors.black],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: LinearGradient(colors: [Colors.grey[900]!, Colors.black], begin: Alignment.topLeft, end: Alignment.bottomRight),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.primaryYellow, width: 2),
-            boxShadow: [
-              BoxShadow(color: AppColors.primaryYellow.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)
-            ]
+            border: Border.all(color: AppColors.primaryYellow, width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Ícone Grande
-              Container(
-                height: 100, width: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black,
-                  border: Border.all(color: AppColors.primaryYellow, width: 2),
-                ),
-                child: ClipOval(
-                  child: (badge['icon_url'] != null && badge['icon_url'].toString().isNotEmpty)
-                      ? Image.network(badge['icon_url'], fit: BoxFit.cover, errorBuilder: (c,e,s) => const Icon(Icons.emoji_events, size: 50, color: AppColors.primaryYellow))
-                      : const Icon(Icons.emoji_events, size: 50, color: AppColors.primaryYellow),
-                ),
-              ),
+              if (b['icon_url'] != null && b['icon_url'].toString().isNotEmpty)
+                Image.network(b['icon_url'], height: 80, errorBuilder: (c,e,s)=>const Icon(Icons.emoji_events, size: 60, color: AppColors.primaryYellow))
+              else
+                const Icon(Icons.emoji_events, size: 60, color: AppColors.primaryYellow),
               const SizedBox(height: 16),
-              Text(
-                badge['name'].toString().toUpperCase(),
-                style: const TextStyle(color: AppColors.primaryYellow, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
-                textAlign: TextAlign.center,
-              ),
+              Text(b['name'], style: const TextStyle(color: AppColors.primaryYellow, fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              Text(
-                badge['description'] ?? "Sem descrição",
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const Divider(color: Colors.grey, height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                  const SizedBox(width: 6),
-                  Text("Conquistado em: $formattedDate", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
+              Text(b['description'] ?? "", style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("FECHAR"),
-              )
+              ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text("FECHAR"))
             ],
           ),
         ),
@@ -188,6 +144,7 @@ class _PerfilPageState extends State<PerfilPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: RefreshIndicator(
         onRefresh: _refresh,
         color: AppColors.primaryYellow,
@@ -196,7 +153,7 @@ class _PerfilPageState extends State<PerfilPage> {
           future: _userDataFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            if (snapshot.hasError) return ListView(children: [SizedBox(height: 300), Center(child: Text('Erro: ${snapshot.error}', style: TextStyle(color: Colors.white)))]);
+            if (snapshot.hasError) return ListView(children: [SizedBox(height: 300), Center(child: Text('Erro: ${snapshot.error}', style: const TextStyle(color: Colors.white)))]);
             if (!snapshot.hasData) return const Center(child: Text('Nenhum dado.'));
 
             final data = snapshot.data!;
@@ -206,225 +163,311 @@ class _PerfilPageState extends State<PerfilPage> {
             final inviteCode = data['invite_code'];
             final int totalPoints = data['total_global_points'] ?? 0;
             final List<dynamic> sectorsPoints = data['points_by_sector'] ?? [];
+            
             final String? nickname = data['nickname'];
             final String? profilePic = data['profile_pic'];
             final String? birthDate = data['birth_date'];
-            final List<dynamic> badges = data['badges'] ?? []; // Lista de Insígnias
+            final List<dynamic> badges = data['badges'] ?? [];
             final int pointsBudget = data['points_budget'] ?? 0;
 
             final String displayName = (nickname != null && nickname.isNotEmpty) ? nickname : username;
 
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.only(bottom: 100), 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // CARD PERFIL
-                  Card(
-                    color: AppColors.cardBackground,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Stack(
+                  // -------------------------------------------------------
+                  // --- NOVO CARD DE PERFIL (DESIGN PREMIUM) ---
+                  // -------------------------------------------------------
+                  Container(
+                    // MUDANÇA 1: Margem reduzida para ficar mais próximo das bordas
+                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 5))
+                      ]
+                    ),
+                    child: Column(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            children: [
-                              GestureDetector(
-                                onTap: () async {
-                                  final bool? updated = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditarPerfilPage(currentNickname: nickname, currentPhotoUrl: profilePic, currentBirthDate: birthDate)));
-                                  if (updated == true) _refresh();
-                                },
-                                child: Stack(
-                                  alignment: Alignment.bottomRight,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primaryYellow, width: 2)),
-                                      child: CircleAvatar(
-                                        radius: 50,
-                                        backgroundColor: Colors.grey[800],
-                                        backgroundImage: _getImageProvider(profilePic),
-                                        child: (profilePic == null || profilePic.isEmpty) ? const Icon(Icons.person, size: 50, color: Colors.white) : null,
-                                      ),
-                                    ),
-                                    Container(padding: const EdgeInsets.all(6), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.camera_alt, size: 16, color: Colors.black))
-                                  ],
+                        // 1. Capa com Imagem e Avatar Sobreposto
+                        Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            // MUDANÇA 2: Capa com a Imagem da URL
+                            Container(
+                              height: 100,
+                              decoration: const BoxDecoration(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                image: DecorationImage(
+                                  image: NetworkImage("https://media.licdn.com/dms/image/v2/D4D3DAQF8JU9AAHtuBg/image-scale_191_1128/B4DZcimRpxHMAg-/0/1748632149311/bateria_dezorganizada_b10_cover?e=1764835200&v=beta&t=DIb8w0Sh_474p-l-z8y1i4qQ7YlwIItbrasF6alCJAA"),
+                                  fit: BoxFit.cover, // Cobre todo o espaço
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              Text(displayName.toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
-                              if (nickname != null && nickname.isNotEmpty) Text(username, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                              const SizedBox(height: 8),
-                              Chip(label: Text(_getRoleName(role), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), backgroundColor: AppColors.primaryYellow),
+                            ),
+                            // Avatar
+                            Positioned(
+                              bottom: -50, 
+                              child: Container(
+                                padding: const EdgeInsets.all(4), 
+                                decoration: const BoxDecoration(
+                                  color: AppColors.cardBackground, 
+                                  shape: BoxShape.circle,
+                                ),
+                                child: CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Colors.grey[800],
+                                  backgroundImage: _getImageProvider(profilePic),
+                                  child: (profilePic == null || profilePic.isEmpty)
+                                      ? const Icon(Icons.person, size: 50, color: Colors.white54)
+                                      : null,
+                                ),
+                              ),
+                            ),
+                            // Botão de Editar
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: InkWell(
+                                onTap: () async {
+                                  final bool? updated = await Navigator.push(
+                                    context, 
+                                    MaterialPageRoute(builder: (context) => EditarPerfilPage(currentNickname: nickname, currentPhotoUrl: profilePic, currentBirthDate: birthDate))
+                                  );
+                                  if (updated == true) _refresh();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5), // Fundo um pouco mais escuro para destacar na foto
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.edit, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 60), // Espaço para o avatar que desceu
+
+                        // 2. Informações do Usuário
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Column(
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (nickname != null && nickname.isNotEmpty)
+                                Text(username, style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                              
+                              const SizedBox(height: 12),
+                              
+                              // Chips de Info
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryYellow.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: AppColors.primaryYellow.withOpacity(0.5))
+                                    ),
+                                    child: Text(
+                                      _getRoleName(role).toUpperCase(),
+                                      style: const TextStyle(color: AppColors.primaryYellow, fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                  ),
+                                  if (birthDate != null) ...[
+                                    const SizedBox(width: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[800],
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text("🎈 $birthDate", style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                    ),
+                                  ]
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 12),
+                              Text(email, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                              const SizedBox(height: 24),
                             ],
                           ),
                         ),
-                        Positioned(right: 8, top: 8, child: IconButton(icon: const Icon(Icons.edit, color: AppColors.primaryYellow), onPressed: () async {
-                           final bool? updated = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditarPerfilPage(currentNickname: nickname, currentPhotoUrl: profilePic, currentBirthDate: birthDate)));
-                           if (updated == true) _refresh();
-                        })),
                       ],
                     ),
                   ),
-                  
-                  const SizedBox(height: 16),
 
-                  // --- INSÍGNIAS (VISUAL MELHORADO) ---
-                  if (badges.isNotEmpty) ...[
-                    Row(
+                  // -------------------------------------------------------
+                  // RESTO DO CONTEÚDO
+                  // -------------------------------------------------------
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(Icons.military_tech, color: AppColors.primaryYellow),
-                        const SizedBox(width: 8),
-                        Text("CONQUISTAS (${badges.length})", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 110, // Altura aumentada para caber o card bonito
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: badges.length,
-                        itemBuilder: (context, index) {
-                          final b = badges[index]['badge'];
-                          return GestureDetector(
-                            onTap: () => _showBadgeDetails(badges[index]), // Abre o detalhe
-                            child: Container(
-                              width: 90, 
-                              margin: const EdgeInsets.only(right: 12),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardBackground, 
-                                borderRadius: BorderRadius.circular(16), 
-                                border: Border.all(color: Colors.grey[800]!),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 4))]
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // Ícone Circular
-                                  Container(
-                                    height: 50, width: 50,
+                        // INSÍGNIAS
+                        if (badges.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4, bottom: 8),
+                            child: Text("CONQUISTAS", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                          SizedBox(
+                            height: 90,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: badges.length,
+                              itemBuilder: (context, index) {
+                                final b = badges[index]['badge'];
+                                return GestureDetector(
+                                  onTap: () => _showBadgeDetails(badges[index]),
+                                  child: Container(
+                                    width: 80, 
+                                    margin: const EdgeInsets.only(right: 12),
                                     decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: AppColors.primaryYellow, width: 1),
-                                      image: (b['icon_url'] != null && b['icon_url'].toString().isNotEmpty) 
-                                          ? DecorationImage(image: NetworkImage(b['icon_url']), fit: BoxFit.cover)
-                                          : null
+                                      color: AppColors.cardBackground, 
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white10),
                                     ),
-                                    child: (b['icon_url'] == null || b['icon_url'].toString().isEmpty) 
-                                        ? const Icon(Icons.emoji_events, color: AppColors.primaryYellow) : null,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        if (b['icon_url'] != null && b['icon_url'].toString().isNotEmpty)
+                                           Image.network(b['icon_url'], width: 40, height: 40, errorBuilder: (c,e,s)=>const Icon(Icons.emoji_events, color: AppColors.primaryYellow))
+                                        else
+                                           const Icon(Icons.emoji_events, color: AppColors.primaryYellow, size: 40),
+                                        const SizedBox(height: 6),
+                                        Text(b['name'], style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    b['name'], 
-                                    textAlign: TextAlign.center, 
-                                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold), 
-                                    maxLines: 2, 
-                                    overflow: TextOverflow.ellipsis
-                                  )
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+
+                        // CARD PONTUAÇÃO GERAL (Estilo Moderno)
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Colors.white10, Colors.black]),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white12)
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("RANKING GERAL", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  Text("Pontos Acumulados", style: TextStyle(color: Colors.grey, fontSize: 12)),
                                 ],
                               ),
+                              Text("$totalPoints", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primaryYellow)),
+                            ],
+                          ),
+                        ),
+
+                        // Orçamento (Líder)
+                        if (role == '1') ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.green.withOpacity(0.5))
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  // ---------------------------------------
-
-                  // ORÇAMENTO
-                  if (role == '1') ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.green[900]!.withOpacity(0.3), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("MEU ORÇAMENTO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          Text("$pointsBudget pts", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text("MEU ORÇAMENTO", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                Text("$pointsBudget pts", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
 
-                  // PONTUAÇÃO GERAL
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [AppColors.primaryYellow.withOpacity(0.8), AppColors.primaryYellow]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: AppColors.primaryYellow.withOpacity(0.2), blurRadius: 15)]
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text("GERAL B10", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-                          Text("Pontos Totais", style: TextStyle(color: Colors.black54)),
-                        ]),
-                        Text("$totalPoints pts", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black)),
+                        const SizedBox(height: 24),
+
+                        // SETORES
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4, bottom: 8),
+                          child: Text("MEUS SETORES", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                        
+                        if (sectorsPoints.isEmpty) 
+                          const Center(child: Text("Nenhum setor vinculado.", style: TextStyle(color: Colors.grey)))
+                        else 
+                          ...sectorsPoints.map((sector) => Card(
+                            color: AppColors.cardBackground,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: ListTile(
+                              leading: const Icon(Icons.circle, size: 12, color: Color.fromRGBO(255, 215, 0, 1)),
+                              title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              trailing: Text("${sector['points']} pts", style: const TextStyle(color: Color.fromRGBO(255, 215, 0, 1), fontSize: 16)),
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SectorRankingDetailPage(sectorId: sector['sector_id'], sectorName: sector['sector_name']))),
+                            ),
+                          )),
+
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _showJoinSectorDialog,
+                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey)),
+                          child: const Text("Entrar em outro Setor", style: TextStyle(color: Colors.white)),
+                        ),
+                        
+                        // CÓDIGO DE CONVITE (LÍDER)
+                        if (inviteCode != null) ...[
+                          const SizedBox(height: 30),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryYellow,
+                              borderRadius: BorderRadius.circular(12)
+                            ),
+                            child: Column(
+                              children: [
+                                const Text("CONVITE DO SETOR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(inviteCode, style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 10),
+                                    InkWell(
+                                      onTap: () {
+                                        Clipboard.setData(ClipboardData(text: inviteCode));
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.black));
+                                      },
+                                      child: const Icon(Icons.copy, color: Colors.black),
+                                    )
+                                  ],
+                                )
+                              ],
+                            ),
+                          )
+                        ]
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  const Text("MEUS SETORES", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                  const SizedBox(height: 8),
-                  if (sectorsPoints.isEmpty) const Center(child: Text("Sem setores.", style: TextStyle(color: Colors.grey)))
-                  else ...sectorsPoints.map((sector) {
-                    return Card(
-                      color: AppColors.cardBackground,
-                      child: ListTile(
-                        leading: const Icon(Icons.pie_chart, color: AppColors.primaryYellow),
-                        title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        trailing: Text("${sector['points']} pts", style: const TextStyle(color: AppColors.primaryYellow, fontSize: 16, fontWeight: FontWeight.bold)),
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SectorRankingDetailPage(sectorId: sector['sector_id'], sectorName: sector['sector_name']))),
-                      ),
-                    );
-                  }).toList(),
-
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _showJoinSectorDialog,
-                    icon: const Icon(Icons.add_link),
-                    label: const Text("Entrar em outro Setor"),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  if (inviteCode != null) ...[
-                    Card(
-                      color: Colors.grey[900],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.primaryYellow, width: 1)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("CONVITE DO SETOR (LÍDER)", style: TextStyle(color: AppColors.primaryYellow, fontSize: 10, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(child: Text(inviteCode, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1))),
-                                IconButton(
-                                  icon: const Icon(Icons.copy, color: Colors.white),
-                                  onPressed: () {
-                                    Clipboard.setData(ClipboardData(text: inviteCode));
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.green));
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 100), 
                 ],
               ),
             );

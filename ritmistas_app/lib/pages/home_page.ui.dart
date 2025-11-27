@@ -1,7 +1,4 @@
-// lib/pages/home_page.dart
-
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/main.dart'; // Importa AppColors e Theme
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
 import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
@@ -12,11 +9,16 @@ import 'package:ritmistas_app/pages/resgate_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
-import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
+import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart'; 
+import 'package:ritmistas_app/pages/login.dart';
 
-// Importa a LoginPage para o logout
-import 'package:ritmistas_app/main.dart' show LoginPage; 
-
+class AppColors {
+  static const Color background = Color(0xFF121212); // Preto fundo
+  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
+  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
+  static const Color textWhite = Colors.white;
+  static const Color textGrey = Colors.grey;
+}
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 

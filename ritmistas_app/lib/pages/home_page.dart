@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:ritmistas_app/main.dart' hide LoginPage; // Esconde para não conflitar
-import 'package:ritmistas_app/pages/login_page.dart'; // Importa a página de Login explicitamente
-
-// IMPORTS DAS PÁGINAS
+import 'package:ritmistas_app/main.dart'; // Esconde para não conflitar
 import 'package:ritmistas_app/pages/admin_atividades_page.dart';
-import 'package:ritmistas_app/pages/admin_cadastro_page.dart';
 import 'package:ritmistas_app/pages/admin_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_usuarios_page.dart';
 import 'package:ritmistas_app/pages/perfil_page.dart';
 import 'package:ritmistas_app/pages/ranking_page.dart';
 import 'package:ritmistas_app/pages/resgate_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// IMPORTS ADMIN MASTER
+import 'package:ritmistas_app/pages/login.dart';
 import 'package:ritmistas_app/pages/admin_master_setores_page.dart';
 import 'package:ritmistas_app/pages/admin_master_lideres_page.dart';
 import 'package:ritmistas_app/pages/admin_aprovacoes_page.dart';
@@ -22,10 +17,15 @@ import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
 import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
-
-// IMPORT SCANNER
 import 'package:ritmistas_app/pages/scan_page.dart';
 
+class AppColors {
+  static const Color background = Color(0xFF121212); // Preto fundo
+  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
+  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
+  static const Color textWhite = Colors.white;
+  static const Color textGrey = Colors.grey;
+}
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -47,7 +47,6 @@ class _HomePageState extends State<HomePage> {
     return prefs.getString('user_role');
   }
 
-  // --- CORREÇÃO DEFINITIVA DO CRASH AO SAIR ---
   Future<void> _handleLogout() async {
 
     final navigator = Navigator.of(context, rootNavigator: true);
