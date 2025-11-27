@@ -1,3 +1,5 @@
+// lib/pages/scan_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:ritmistas_app/main.dart'; // AppColors
@@ -29,14 +31,16 @@ class _ScanPageState extends State<ScanPage> {
     for (final barcode in barcodes) {
       if (barcode.rawValue != null) {
         setState(() => _isProcessing = true);
-        await _processCheckIn(barcode.rawValue!);
+        await _processCode(barcode.rawValue!); // Nome da função atualizado
         break;
       }
     }
   }
 
-  Future<void> _processCheckIn(String activityId) async {
+  // --- CORREÇÃO: LÓGICA HÍBRIDA (Igual ao Resgate Manual) ---
+  Future<void> _processCode(String code) async {
     try {
+      // 1. Loading
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -47,10 +51,26 @@ class _ScanPageState extends State<ScanPage> {
       final token = prefs.getString('access_token');
       if (token == null) throw Exception("Não autenticado.");
 
-      final message = await _apiService.checkIn(activityId, token);
+      String message = "";
+
+      // 2. TENTATIVA DUPLA
+      try {
+        // A) Tenta como Código Geral / Bônus (Admin Master ou Orçamento)
+        message = await _apiService.redeemCode(code, token);
+      } catch (e) {
+        // B) Se falhar, tenta como Check-in de Atividade (Líder)
+        try {
+           message = await _apiService.checkIn(code, token);
+        } catch (e2) {
+           // C) Se falhar nos dois, é inválido mesmo
+           throw Exception("Código inválido ou não encontrado.");
+        }
+      }
 
       if (mounted) {
         Navigator.pop(context); // Fecha loading
+        
+        // 3. Sucesso
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -61,7 +81,7 @@ class _ScanPageState extends State<ScanPage> {
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx); // Fecha alerta
-                  Navigator.pop(context); // Sai da câmera
+                  Navigator.pop(context); // Fecha câmera
                 },
                 child: const Text("OK"),
               )
@@ -72,12 +92,17 @@ class _ScanPageState extends State<ScanPage> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Fecha loading
+        
+        // 4. Erro
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
+        
+        // Destrava para tentar de novo
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) setState(() => _isProcessing = false);
       }
@@ -93,15 +118,15 @@ class _ScanPageState extends State<ScanPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // CORREÇÃO: Compatível com MobileScanner 6.0+
           IconButton(
             icon: ValueListenableBuilder(
-              valueListenable: controller, // Escuta o controller, não o torchState
+              valueListenable: controller, 
               builder: (context, state, child) {
                 if (state.torchState == TorchState.on) {
                   return const Icon(Icons.flash_on, color: AppColors.primaryYellow);
+                } else {
+                  return const Icon(Icons.flash_off, color: Colors.grey);
                 }
-                return const Icon(Icons.flash_off, color: Colors.grey);
               },
             ),
             onPressed: () => controller.toggleTorch(),
