@@ -47,24 +47,19 @@ class ApiService {
         username = user.displayName ?? 'Usuário Google';
         googleId = user.uid;
       } else {
-        // Mobile/desktop: initialize and authenticate via GoogleSignIn
+        // Mobile/desktop: authenticate via GoogleSignIn
         try {
-          await GoogleSignIn.instance.initialize();
-        } catch (_) {
-          // ignore if already initialized
-        }
-
-        late final GoogleSignInAccount googleUser;
-        try {
-          googleUser = await GoogleSignIn.instance.authenticate();
-        } on GoogleSignInException catch (e) {
-          if (e.code == GoogleSignInExceptionCode.canceled) throw Exception('Login cancelado.');
+          final googleUser = await GoogleSignIn().signIn();
+          if (googleUser == null) throw Exception('Login cancelado.');
+          email = googleUser.email;
+          username = googleUser.displayName ?? 'Usuário Google';
+          googleId = googleUser.id ?? googleUser.email;
+        } catch (e) {
+          // normalize error message
+          final msg = e.toString();
+          if (msg.contains('cancel') || msg.contains('Cancel')) throw Exception('Login cancelado.');
           rethrow;
         }
-
-        email = googleUser.email;
-        username = googleUser.displayName ?? 'Usuário Google';
-        googleId = googleUser.id;
       }
 
       final url = Uri.parse('$_baseUrl/auth/google');
