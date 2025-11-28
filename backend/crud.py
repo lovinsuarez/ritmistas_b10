@@ -92,11 +92,27 @@ def create_sector(db: Session, sector_name: str):
 def get_all_sectors(db: Session):
     return db.query(models.Sector).all()
 def join_sector(db: Session, user: models.User, invite_code: str):
+    # 1. Busca o setor
     sector = get_sector_by_invite_code(db, invite_code)
     if not sector: return "Código inválido."
-    if sector in user.sectors: return "Você já está neste setor."
-    user.sectors.append(sector)
+    
+    # 2. Verifica se já existe o vínculo DIRETO na tabela de associação
+    exists = db.query(models.user_sectors).filter_by(
+        user_id=user.user_id, 
+        sector_id=sector.sector_id
+    ).first()
+    
+    if exists: 
+        return "Você já está neste setor."
+    
+    # 3. INSERÇÃO EXPLÍCITA (Blindada contra falhas de ORM)
+    stmt = models.user_sectors.insert().values(
+        user_id=user.user_id, 
+        sector_id=sector.sector_id
+    )
+    db.execute(stmt)
     db.commit()
+    
     return f"Bem-vindo ao setor {sector.name}!"
 
 def update_user_role(db: Session, user_to_update: models.User, new_role: models.UserRole):
