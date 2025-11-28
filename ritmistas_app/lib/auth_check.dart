@@ -1,17 +1,12 @@
 // lib/auth_check.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/pages/home_page.dart';
-import 'package:ritmistas_app/pages/login.dart';
+import 'package:ritmistas_app/main.dart'; 
+import 'package:ritmistas_app/pages/home_page.dart' hide AppColors;
+import 'package:ritmistas_app/pages/login.dart'; // Importa a página certa
+import 'package:ritmistas_app/services/api_service.dart'; // Importa o serviço
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AppColors {
-  static const Color background = Color(0xFF121212); // Preto fundo
-  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
-  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
-  static const Color textWhite = Colors.white;
-  static const Color textGrey = Colors.grey;
-}
 class AuthCheck extends StatefulWidget {
   const AuthCheck({super.key});
 
@@ -20,12 +15,28 @@ class AuthCheck extends StatefulWidget {
 }
 
 class _AuthCheckState extends State<AuthCheck> {
+  
   Future<bool> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
-    // Se tiver token, retorna true (está logado)
-    // Se for nulo, retorna false (não está logado)
-    return token != null;
+    
+    // 1. Se não tem token salvo, vai pro login
+    if (token == null) return false;
+
+    // 2. AQUI ESTÁ A MUDANÇA:
+    // Testamos se o token é válido no servidor atual
+    try {
+      final api = ApiService();
+      await api.getUsersMe(token); // Tenta buscar o perfil
+      
+      // Se passou daqui, o usuário existe no banco atual. Pode entrar.
+      return true; 
+    } catch (e) {
+      // Se deu erro (401, 404, etc), significa que o banco mudou ou o token expirou.
+      // Limpamos a memória para obrigar um novo login.
+      await prefs.clear();
+      return false;
+    }
   }
 
   @override
@@ -33,7 +44,7 @@ class _AuthCheckState extends State<AuthCheck> {
     return FutureBuilder<bool>(
       future: _checkLoginStatus(),
       builder: (context, snapshot) {
-        // 1. Enquanto verifica, mostra uma tela de carregamento (Splash)
+        // Tela de carregamento enquanto verifica o servidor
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Colors.black,
@@ -43,12 +54,12 @@ class _AuthCheckState extends State<AuthCheck> {
           );
         }
 
-        // 2. Se tem token, vai pra Home
+        // Se retornou true, vai pra Home
         if (snapshot.data == true) {
           return const HomePage();
         }
 
-        // 3. Se não tem token, vai pro Login
+        // Se retornou false, vai pro Login
         return const LoginPage();
       },
     );
