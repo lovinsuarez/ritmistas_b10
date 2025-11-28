@@ -156,3 +156,9 @@ class AuditLogItem(BaseConfig):
     description: str
     points: int
     is_general: bool
+
+class GoogleLoginRequest(BaseConfig):
+    email: EmailStr
+    username: str
+    google_id: str
+    invite_code: str | None = None # Novo campo opcional

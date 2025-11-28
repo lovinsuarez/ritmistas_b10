@@ -6,6 +6,42 @@ import io
 from datetime import datetime
 import random
 import string
+import secrets # Para gerar senha aleatória
+
+# ... (lá embaixo, junto com as funções de login) ...
+
+def login_with_google(db: Session, google_data: schemas.GoogleLoginRequest):
+    # 1. Tenta achar o usuário
+    user = get_user_by_email(db, google_data.email)
+    if user:
+        return user # Usuário existe, deixa entrar
+        
+    # 2. Se é NOVO, exige código
+    if not google_data.invite_code:
+        return None # Retorna None para avisar que precisa do código
+        
+    # 3. Valida o código
+    invite = validate_system_invite(db, google_data.invite_code)
+    if not invite:
+        raise ValueError("Código de convite inválido.")
+
+    # 4. Cria o usuário
+    random_pass = secrets.token_urlsafe(16)
+    hashed = security.get_password_hash(random_pass)
+    
+    new_user = models.User(
+        email=google_data.email,
+        username=google_data.username,
+        hashed_password=hashed,
+        role=models.UserRole.user,
+        status=models.UserStatus.PENDING, # Pendente de aprovação
+        nickname=google_data.username
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()

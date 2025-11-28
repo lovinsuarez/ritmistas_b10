@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "306431187598-phq8iguuktcv8h1lfnvo5l0h8tg33a4j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ritmistas_app",
+            "certificate_hash": "26ab62811c5b208b4a77f6cdc04d40ebf75149b7"
+          }
+        },
+        {
+          "client_id": "306431187598-tkd0d9uhog8uanvpnt07cuob3n8mdarq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ritmistas_app",
+            "certificate_hash": "a049f7851481beeede20f8edda1d5f3ecff2d861"
+          }
+        },
+        {
           "client_id": "306431187598-0s9dlndonjdprs41krohahbmd06tb2pq.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +45,13 @@
             {
               "client_id": "306431187598-0s9dlndonjdprs41krohahbmd06tb2pq.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "306431187598-b8chtu2n08g3c8pnofr7hh0cr9kv3e86.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ritmistasApp"
+              }
             }
           ]
         }

@@ -3,17 +3,24 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 // 1. Importa os modelos (que estão em app_models.dart)
 import 'package:ritmistas_app/models/app_models.dart';
-
-// 2. Exporta os modelos para que o resto do app os enxergue
 export 'package:ritmistas_app/models/app_models.dart';
 
 class ApiService {
-  static const String _baseUrl = "https://ritmistas-api.onrender.com";
+  // Base URL configurável via --dart-define. Default aponta para deploy.
+  // Para testes locais no emulador Android use:
+  // flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://ritmistas-api.onrender.com',
+  );
 
   // --- AUTH ---
+  
   Future<String> login(String email, String password) async {
     final url = Uri.parse('$_baseUrl/auth/token');
     final response = await http.post(
@@ -23,6 +30,72 @@ class ApiService {
     );
     if (response.statusCode == 200) return jsonDecode(response.body)['access_token'];
     throw Exception(jsonDecode(response.body)['detail'] ?? 'Erro login');
+  }
+
+  Future<String> loginWithGoogle({String? inviteCode}) async {
+    try {
+      String email;
+      String username;
+      String googleId;
+
+      if (kIsWeb) {
+        // Web: use FirebaseAuth popup flow
+        final userCredential = await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+        final user = userCredential.user;
+        if (user == null) throw Exception('Login cancelado.');
+        email = user.email ?? '';
+        username = user.displayName ?? 'Usuário Google';
+        googleId = user.uid;
+      } else {
+        // Mobile/desktop: initialize and authenticate via GoogleSignIn
+        try {
+          await GoogleSignIn.instance.initialize();
+        } catch (_) {
+          // ignore if already initialized
+        }
+
+        late final GoogleSignInAccount googleUser;
+        try {
+          googleUser = await GoogleSignIn.instance.authenticate();
+        } on GoogleSignInException catch (e) {
+          if (e.code == GoogleSignInExceptionCode.canceled) throw Exception('Login cancelado.');
+          rethrow;
+        }
+
+        email = googleUser.email;
+        username = googleUser.displayName ?? 'Usuário Google';
+        googleId = googleUser.id;
+      }
+
+      final url = Uri.parse('$_baseUrl/auth/google');
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email,
+          "username": username,
+          "google_id": googleId,
+          "invite_code": inviteCode
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['access_token'];
+      } else {
+        // Tenta decodificar JSON com 'detail', caso contrário fornece mensagem HTTP bruta
+        try {
+          final errorData = jsonDecode(response.body);
+          final detail = errorData['detail'];
+          if (detail == "NEED_INVITE_CODE") throw Exception("NEED_INVITE_CODE");
+          throw Exception(detail ?? 'Falha no login Google');
+        } catch (_) {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains("NEED_INVITE_CODE")) rethrow;
+      throw Exception(e.toString().replaceAll("Exception: ", ""));
+    }
   }
 
   Future<void> registerAdminMaster({required String email, required String password, required String username}) async {

@@ -18,8 +18,11 @@ from models import User, UserRole
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # 2. Configuração do JWT
-# IMPORTANTE: Cole sua chave secreta gerada no terminal aqui!
-SECRET_KEY = "fc6151968f29a237ba0aec3e1f1ecb0c1627511dde8c853ac91636325e01325f"
+import os
+
+# SECRET_KEY should come from environment in production. A default is provided
+# for local development but you MUST set a strong SECRET_KEY in Render.
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 dias
 # Esta é a URL que o FastAPI usará para saber "como" o usuário faz login

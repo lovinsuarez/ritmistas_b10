@@ -1,5 +1,5 @@
 # C:\Users\jeatk\OneDrive\Documents\GitHub\ritimistas_b10\backend\main.py
-from fastapi import FastAPI, Depends, HTTPException, status, Body, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Query, Header
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -9,15 +9,43 @@ from typing import List, Optional
 import io
 import crud, models, schemas, security
 from database import engine, get_db
+import os
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Projeto Ritmistas B10 API v4")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # --- AUTH ---
+@app.post("/auth/google", response_model=schemas.Token)
+def google_login(data: schemas.GoogleLoginRequest, db: Session = Depends(get_db)):
+    try:
+        user = crud.login_with_google(db, data)
+        
+        # Se retornou None, é porque falta o código
+        if user is None:
+            raise HTTPException(status_code=400, detail="NEED_INVITE_CODE")
+            
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Código de convite inválido ou expirado.")
+
+    if user.status == models.UserStatus.PENDING:
+        raise HTTPException(status_code=403, detail="Cadastro recebido! Aguarde aprovação do Admin Master.")
+        
+    token = security.create_access_token(data={"sub": user.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
+    return {"access_token": token, "token_type": "bearer"}
+
 @app.post("/auth/register/admin-master", response_model=schemas.User)
-def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db)):
-    if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
+def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db), x_admin_key: Optional[str] = Header(None)):
+    # Protege a criação de Admin Master exigindo uma chave de criação definida em
+    # ADMIN_CREATION_KEY no ambiente. Evita registro público de Admins em produção.
+    admin_key = os.getenv("ADMIN_CREATION_KEY")
+    if not admin_key:
+        # Se não estiver definida, desabilitamos a criação via endpoint por segurança
+        raise HTTPException(status_code=403, detail="Admin creation disabled on this deployment.")
+    if x_admin_key != admin_key:
+        raise HTTPException(status_code=403, detail="Invalid admin creation key.")
+    if crud.get_user_by_email(db, d.email):
+        raise HTTPException(status_code=400, detail="Email existe.")
     return crud.create_admin_master(db, d)
 
 @app.post("/auth/register/user", response_model=schemas.User, status_code=201)
@@ -220,6 +248,10 @@ def download_audit(db: Session = Depends(get_db), a: models.User = Depends(secur
 def create_admin_general_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
     d.is_general = True
     return crud.create_general_code(db, d, a)
+
+
+# Nota: rota de desenvolvimento `/dev/create-invite` removida. Para criar
+# convites em ambiente de desenvolvimento, use os scripts locais (ex.: create_invite.py).
 
 # CORREÇÃO: Endpoint para Admin listar códigos gerais
 @app.get("/admin-master/codes/general", response_model=List[schemas.CodeDetail])
