@@ -7,7 +7,7 @@ import os
 # Para desenvolvimento local sem Postgres, o fallback é um SQLite file `./dev.db`.
 # Render provisiona DATABASE_URL no formato `postgres://...` — normalizamos para
 # `postgresql://` porque SQLAlchemy/psycopg2 esperam esse esquema.
-DATABASE_URL = os.getenv("postgresql://ritmistas_db_3u5z_user:e3DTpnLLW4hR4w3QzJa5dfD205Dt5zYp@dpg-d4kcdhc9c44c73es884g-a/ritmistas_db_3u5z", "sqlite:///./dev.db")
+DATABASE_URL = os.getenv("postgresql://ritmistas_db_4ggr_user:oHvWTOXCPlZnRg2oQsA0KQmO2hXDSj4X@dpg-d4kgvfogjchc73a5qne0-a/ritmistas_db_4ggr", "sqlite:///./dev.db")
 
 # Normaliza esquema "postgres://" para "postgresql://"
 if isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("postgres://"):

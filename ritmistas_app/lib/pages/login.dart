@@ -276,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             const Text("Desenvolvido por ", style: TextStyle(color: Colors.grey, fontSize: 12)),
             InkWell(
-              onTap: () => launchUrl(Uri.parse("https://www.instagram.com/dualforge/")), 
+              onTap: () => launchUrl(Uri.parse("https://www.instagram.com/dual.forge/")), 
               child: Text("DUALFORGE", style: TextStyle(color: AppColors.primaryYellow.withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 12, decoration: TextDecoration.underline, decorationColor: AppColors.primaryYellow)),
             ),
           ],

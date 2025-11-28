@@ -35,17 +35,8 @@ def google_login(data: schemas.GoogleLoginRequest, db: Session = Depends(get_db)
     return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/auth/register/admin-master", response_model=schemas.User)
-def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db), x_admin_key: Optional[str] = Header(None)):
-    # Protege a criação de Admin Master exigindo uma chave de criação definida em
-    # ADMIN_CREATION_KEY no ambiente. Evita registro público de Admins em produção.
-    admin_key = os.getenv("ADMIN_CREATION_KEY")
-    if not admin_key:
-        # Se não estiver definida, desabilitamos a criação via endpoint por segurança
-        raise HTTPException(status_code=403, detail="Admin creation disabled on this deployment.")
-    if x_admin_key != admin_key:
-        raise HTTPException(status_code=403, detail="Invalid admin creation key.")
-    if crud.get_user_by_email(db, d.email):
-        raise HTTPException(status_code=400, detail="Email existe.")
+def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db)): # <--- SÓ PODE TER ISSO
+    if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
     return crud.create_admin_master(db, d)
 
 @app.post("/auth/register/user", response_model=schemas.User, status_code=201)

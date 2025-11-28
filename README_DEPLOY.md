@@ -59,6 +59,12 @@ Este documento descreve passos práticos para colocar o backend (FastAPI) e o fr
 
 - Observação: o código já lê `API_BASE_URL` com fallback para `https://ritmistas-api.onrender.com`.
 
+- Docker builds: se usar o `Dockerfile` presente no repositório, confirme a imagem base do Flutter
+  suporta a versão do Dart exigida pelas dependências. Se durante o build aparecer erro do tipo
+  "The current Dart SDK version is X.Y.Z" relacionado a `google_sign_in`, atualize a imagem no
+  `Dockerfile` para uma tag compatível (ex.: `instrumentisto/flutter:3.38.3`) ou ajuste a versão
+  do pacote (`google_sign_in:^6.2.2`) no `pubspec.yaml` como fallback temporário.
+
 ## 5) Limpeza antes do deploy (recomendada)
 
 - Remova rotas ou scripts de desenvolvimento (opcional):
