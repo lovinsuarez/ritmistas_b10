@@ -9,6 +9,7 @@ import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+
 class EditarPerfilPage extends StatefulWidget {
   final String? currentNickname;
   final String? currentPhotoUrl;
