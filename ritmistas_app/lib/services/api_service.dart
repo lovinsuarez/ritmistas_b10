@@ -99,16 +99,20 @@ class ApiService {
 
   Future<void> registerAdminMaster({required String email, required String password, required String username}) async {
     final url = Uri.parse('$_baseUrl/auth/register/admin-master');
-    final headers = {"Content-Type": "application/json"};
-    if (_adminCreationKey.isNotEmpty) headers['X-ADMIN-CREATION-KEY'] = _adminCreationKey;
-    final response = await http.post(url, headers: headers, body: jsonEncode({"email": email, "username": username, "password": password}));
+    final response = await http.post(
+      url, 
+      headers: {"Content-Type": "application/json"}, 
+      body: jsonEncode({"email": email, "username": username, "password": password})
+    );
+    
     if (response.statusCode != 200) {
-      // Propaga detalhe quando disponível
+      // Tenta ler a mensagem de erro do servidor
       try {
-        final body = jsonDecode(response.body);
-        throw Exception(body['detail'] ?? 'Erro registrar admin');
-      } catch (_) {
-        throw Exception('Erro registrar admin: HTTP ${response.statusCode}');
+        final errorBody = jsonDecode(response.body);
+        throw Exception("Erro ${response.statusCode}: ${errorBody['detail']}");
+      } catch (e) {
+        // Se não conseguir ler, mostra o texto bruto
+        throw Exception("Erro ${response.statusCode}: ${response.body}");
       }
     }
   }
