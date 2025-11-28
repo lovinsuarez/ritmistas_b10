@@ -2,12 +2,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import os
+import logging
 
-# Use DATABASE_URL da variável de ambiente quando disponível.
-# Para desenvolvimento local sem Postgres, o fallback é um SQLite file `./dev.db`.
-# Render provisiona DATABASE_URL no formato `postgres://...` — normalizamos para
-# `postgresql://` porque SQLAlchemy/psycopg2 esperam esse esquema.
-DATABASE_URL = os.getenv("postgresql://ritmistas_db_mflq_user:O6bAM9I4Jl6fDNzYuoMssWK2B5wdBs0I@dpg-d4ktmdje5dus73ff418g-a/ritmistas_db_mflq")
+logger = logging.getLogger(__name__)
+
+# Lê a variável de ambiente DATABASE_URL corretamente.
+# Se não definida, usa um SQLite local para desenvolvimento.
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    logger.warning("DATABASE_URL não definido — usando fallback sqlite local (./dev.db)")
+    DATABASE_URL = "sqlite:///./dev.db"
 
 # Normaliza esquema "postgres://" para "postgresql://"
 if isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("postgres://"):
@@ -20,7 +24,7 @@ if isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("postgresql://") an
     else:
         DATABASE_URL = DATABASE_URL + "?sslmode=require"
 
-if DATABASE_URL.startswith("sqlite"):
+if isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     # Para Postgres em produção: habilitamos pool_pre_ping para conexões mais estáveis
