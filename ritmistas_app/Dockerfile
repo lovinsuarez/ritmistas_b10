@@ -1,5 +1,7 @@
 # Usamos uma versão estável que funciona com as dependências acima
-FROM instrumentisto/flutter:3.22.2 AS build
+## Use a Flutter image with Dart >= 3.6 to satisfy newer packages (google_sign_in >=6.3)
+## Suggested tag from build error: 3.38.3
+FROM instrumentisto/flutter:3.38.3 AS build
 
 WORKDIR /app
 
