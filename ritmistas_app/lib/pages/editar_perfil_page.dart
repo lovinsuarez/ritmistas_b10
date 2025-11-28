@@ -78,7 +78,10 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
       UploadTask uploadTask = ref.putData(data, SettableMetadata(contentType: 'image/jpeg'));
       
       TaskSnapshot snapshot = await uploadTask;
-      return await snapshot.ref.getDownloadURL();
+      final url = await snapshot.ref.getDownloadURL();
+      // Log para depuração — útil para verificar se o URL é acessível
+      debugPrint('Upload concluído. downloadURL: $url');
+      return url;
     } catch (e) {
       throw Exception("Falha no upload da imagem: $e");
     }

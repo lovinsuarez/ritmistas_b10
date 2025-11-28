@@ -110,6 +110,9 @@ class _PerfilPageState extends State<PerfilPage> {
           return const Center(child: CircularProgressIndicator(color: AppColors.primaryYellow));
         },
         errorBuilder: (context, error, stackTrace) {
+          // Loga o erro para diagnóstico (ex.: 403, 404, CORS)
+          debugPrint('Erro ao carregar profile image: $error');
+          if (stackTrace != null) debugPrintStack(stackTrace: stackTrace);
           // SE APARECER ESTE ÍCONE VERMELHO, É ERRO DE REDE/PERMISSÃO
           return const Icon(Icons.broken_image, color: Colors.red, size: 40);
         },
