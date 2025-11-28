@@ -226,33 +226,25 @@ def add_budget_to_lider(db: Session, lider_id: int, points: int):
     return lider
 
 def distribute_points_from_budget(db: Session, lider: models.User, target_user_id: int, points: int, description: str):
-    if lider.points_budget < points:
-        return False, "Orçamento insuficiente."
-        
+    if lider.points_budget < points: return False, "Orçamento insuficiente."
     target_user = get_user_by_id(db, target_user_id)
     if not target_user: return False, "Usuário não encontrado."
-
-    # 1. Desconta do Líder
+    
     lider.points_budget -= points
     
-    # 2. Cria o registro de pontos (Código Único)
+    # Cria o registro SEM SETOR (sector_id=None), mas GERAL (is_general=True)
+    # Assim ele conta no ranking geral, mas NÃO no ranking do setor.
     transaction_record = models.RedeemCode(
         code_string=f"BONUS-{target_user.user_id}-{datetime.now().timestamp()}",
-        points_value=points,
-        type=models.CodeType.unique,
-        is_redeemed=True,
-        
-        # --- AQUI ESTÁ A CORREÇÃO ---
-        is_general=True,  # Conta no Geral
-        sector_id=None,   # NÃO CONTA NO SETOR (Deixamos nulo propositalmente)
-        # ----------------------------
-        
-        created_by=lider.user_id,
+        points_value=points, 
+        type=models.CodeType.unique, 
+        is_redeemed=True, 
+        is_general=True, 
+        sector_id=None, # <--- AQUI ESTÁ A MÁGICA
+        created_by=lider.user_id, 
         assigned_user_id=target_user.user_id
     )
-    
-    db.add(transaction_record)
-    db.commit()
+    db.add(transaction_record); db.commit()
     return True, "Pontos enviados com sucesso!"
 
 # --- CÁLCULOS ---

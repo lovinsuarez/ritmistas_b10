@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 # --- CORREÇÃO: URL DIRETA (SEM OS.GETENV ERRADO) ---
 # Isso garante que ele vai conectar no Render e não no local.
-DATABASE_URL = "postgresql://ritmistas_db_r733_user:F9yMNPivBXlE94LeLfrRuxZTS8UkBi85@dpg-d4kul549c44c73f78bag-a/ritmistas_db_r733"
+DATABASE_URL = "postgresql://ritmistas_db_x0wf_user:anOJSIOqHjuUf00S8NfgHIGRtZXSJIW7@dpg-d4l1456uk2gs7384ta70-a/ritmistas_db_x0wf"
 
 # Fallback de segurança apenas se a string acima estiver vazia (o que não vai acontecer)
 if not DATABASE_URL:
