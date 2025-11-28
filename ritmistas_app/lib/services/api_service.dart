@@ -19,6 +19,10 @@ class ApiService {
     defaultValue: 'https://ritmistas-api.onrender.com',
   );
 
+  // Chave usada para permitir criação inicial do Admin Master.
+  // Defina via --dart-define=ADMIN_CREATION_KEY=<valor> quando rodar/buildar.
+  static const String _adminCreationKey = String.fromEnvironment('ADMIN_CREATION_KEY', defaultValue: '');
+
   // --- AUTH ---
   
   Future<String> login(String email, String password) async {
@@ -95,8 +99,18 @@ class ApiService {
 
   Future<void> registerAdminMaster({required String email, required String password, required String username}) async {
     final url = Uri.parse('$_baseUrl/auth/register/admin-master');
-    final response = await http.post(url, headers: {"Content-Type": "application/json"}, body: jsonEncode({"email": email, "username": username, "password": password}));
-    if (response.statusCode != 200) throw Exception('Erro registrar admin');
+    final headers = {"Content-Type": "application/json"};
+    if (_adminCreationKey.isNotEmpty) headers['X-ADMIN-CREATION-KEY'] = _adminCreationKey;
+    final response = await http.post(url, headers: headers, body: jsonEncode({"email": email, "username": username, "password": password}));
+    if (response.statusCode != 200) {
+      // Propaga detalhe quando disponível
+      try {
+        final body = jsonDecode(response.body);
+        throw Exception(body['detail'] ?? 'Erro registrar admin');
+      } catch (_) {
+        throw Exception('Erro registrar admin: HTTP ${response.statusCode}');
+      }
+    }
   }
 
   Future<void> registerUser({required String email, required String password, required String username, required String inviteCode}) async {

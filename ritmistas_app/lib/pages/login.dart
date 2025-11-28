@@ -284,13 +284,9 @@ class _LoginPageState extends State<LoginPage> {
       ),
       body: Stack(
         children: [
-          // IMAGEM DE FUNDO
+          // Fundo simples (imagem removida para estabilidade)
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=2070&auto=format&fit=crop', 
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => Container(color: Colors.black), 
-            ),
+            child: Container(color: Colors.black),
           ),
           // GRADIENTE
           Positioned.fill(
