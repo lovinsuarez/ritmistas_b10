@@ -281,10 +281,10 @@ def calculate_points(db: Session, user_id: int, sector_id: int = None, is_genera
 def get_user_points_breakdown(db: Session, user: models.User):
     points_data = []
     total_global = calculate_points(db, user.user_id, is_general=True)
-    
-    # Busca setores explicitamente do banco, não confiando no objeto 'user' cacheado
+
+    # Query explícita para garantir que pega os setores novos
     my_sectors = db.query(models.Sector).join(models.user_sectors).filter(models.user_sectors.c.user_id == user.user_id).all()
-    
+
     for sector in my_sectors:
         pts = calculate_points(db, user.user_id, sector_id=sector.sector_id)
         points_data.append(schemas.UserSectorPoints(sector_id=sector.sector_id, sector_name=sector.name, points=pts))
