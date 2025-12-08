@@ -13,7 +13,39 @@ import os
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Projeto Ritmistas B10 API v4")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+DEPLOYED_ORIGINS = [
+    # Your Flutter web on Render (add more if you have other frontends)
+    "https://ritmistas-b10-1.onrender.com",
+    "https://ritmistas-b10.onrender.com",  # if you also deploy with this name
+]
+
+# Optional: allow adding more origins via env (comma-separated)
+# Example:
+# CORS_EXTRA_ORIGINS="https://your-custom-domain.com,https://staging.example.com"
+extra = os.getenv("CORS_EXTRA_ORIGINS", "")
+EXTRA_ORIGINS = [o.strip() for o in extra.split(",") if o.strip()]
+
+ALLOWED_ORIGINS = DEPLOYED_ORIGINS + EXTRA_ORIGINS
+
+# Regex to allow common localhost variants with any port
+# Covers:
+# - http://localhost:xxxx
+# - http://127.0.0.1:xxxx
+# - http://0.0.0.0:xxxx
+# - http://[::1]:xxxx (IPv6)
+# And https variants if you ever use them locally
+LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=LOCALHOST_REGEX,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # --- AUTH ---
 @app.post("/auth/google", response_model=schemas.Token)
