@@ -8,7 +8,6 @@ import random
 import string
 import secrets # Para gerar senha aleatória
 
-# ... (lá embaixo, junto com as funções de login) ...
 
 def login_with_google(db: Session, google_data: schemas.GoogleLoginRequest):
     # 1. Tenta achar o usuário
@@ -254,7 +253,8 @@ def add_last_recovery_code(db: Session, user: models.User, code: str):
     return user
 
 def check_recovery_code(db: Session, user: models.User, code: str):
-    return user.last_recovery_code == code
+    import secrets
+    return secrets.compare_digest(user.last_recovery_code or "", code or "")
 
 def clear_recovery_code(db: Session, user: models.User):
     user.last_recovery_code = None

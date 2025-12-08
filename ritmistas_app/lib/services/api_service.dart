@@ -546,10 +546,12 @@ class ApiService {
         '$_baseUrl/auth/send-recovery-password-email?to_address=${Uri.encodeComponent(toAddress)}');
     final response =
         await http.post(uri, headers: {"Content-Type": "application/json"});
+
     if (response.statusCode == 200) return true;
+
     try {
       final data = jsonDecode(response.body);
-      throw Exception(data.toString());
+      throw Exception(data['detail'] ?? data.toString());
     } catch (_) {
       throw Exception(
           'Falha ao enviar email de recuperação (${response.statusCode})');

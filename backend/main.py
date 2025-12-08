@@ -55,23 +55,33 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/auth/send-recovery-password-email")
-def send_recovery_email_endpoint(to_address: str = Query(...), db: Session = Depends(get_db)):
-    from mailer import send_recovery_email
-    code = send_recovery_email(to_address)
-    user = crud.get_user_by_email(db, to_address)
-    if user:
-        crud.add_last_recovery_code(db, user, code)
-        return True
-    return False
+def send_recovery_email_endpoint(
+    to_address: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    from mailer import send_recovery_email_to_address
+
+    try:
+        send_recovery_email_to_address(db, to_address)
+        return {"detail": "OK"}
+    except ValueError as e:
+        if str(e) == "USER_NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        raise
 
 @app.post("/auth/recover-password")
 def recover_password_endpoint(data: schemas.RecoverPasswordRequest, db: Session = Depends(get_db)):
     user = crud.get_user_by_email(db, data.email)
-    if not user: raise HTTPException(404, "Usuário não encontrado.")
-    if not crud.check_recovery_code(db, user, data.code): raise HTTPException(400, "Código inválido.")
-    crud.update_user_password(db, user, data.new_password)
-    return {"detail": "Senha atualizada com sucesso."}
+    if not user:
+        raise HTTPException(404, "Usuário não encontrado.")
 
+    if not crud.check_recovery_code(db, user, data.code):
+        raise HTTPException(400, "Código inválido.")
+
+    crud.update_user_password(db, user, data.new_password)
+    crud.clear_recovery_code(db, user)
+
+    return {"detail": "Senha atualizada com sucesso."}
 
 
 # --- USER ---
