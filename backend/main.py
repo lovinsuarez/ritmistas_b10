@@ -55,7 +55,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/auth/send-recovery-password-email")
-def send_recovery_email_endpoint(to_address: str, db: Session):
+def send_recovery_email_endpoint(to_address: str = Query(...), db: Session = Depends(get_db)):
     from mailer import send_recovery_email
     code = send_recovery_email(to_address)
     user = crud.get_user_by_email(db, to_address)
