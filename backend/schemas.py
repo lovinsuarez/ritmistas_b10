@@ -56,6 +56,7 @@ class User(UserBase):
     points_by_sector: list[UserSectorPoints] | None = None
     total_global_points: int | None = None
     badges: list[UserBadge] = []
+    last_recovery_code: str | None = None
 
 # Outros
 class Sector(BaseConfig):
@@ -162,3 +163,10 @@ class GoogleLoginRequest(BaseConfig):
     username: str
     google_id: str
     invite_code: str | None = None # Novo campo opcional
+    
+
+class RecoverPasswordRequest(BaseConfig):
+    email: EmailStr
+    code: str
+    new_password: str = Field(..., min_length=8, max_length=72)
+    

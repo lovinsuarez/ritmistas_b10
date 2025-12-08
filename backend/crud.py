@@ -247,6 +247,31 @@ def distribute_points_from_budget(db: Session, lider: models.User, target_user_i
     db.add(transaction_record); db.commit()
     return True, "Pontos enviados com sucesso!"
 
+def add_last_recovery_code(db: Session, user: models.User, code: str):
+    user.last_recovery_code = code
+    db.commit()
+    db.refresh(user)
+    return user
+
+def check_recovery_code(db: Session, user: models.User, code: str):
+    return user.last_recovery_code == code
+
+def clear_recovery_code(db: Session, user: models.User):
+    user.last_recovery_code = None
+    db.commit()
+    db.refresh(user)
+    return user
+
+def update_user_password(db: Session, user: models.User, new_password: str):
+    hashed = security.get_password_hash(new_password)
+    user.hashed_password = hashed
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+
+
 # --- CÁLCULOS ---
 def apply_date_filter(query, model_date_column, month: int = None, year: int = None):
     if year: query = query.filter(extract('year', model_date_column) == year)
