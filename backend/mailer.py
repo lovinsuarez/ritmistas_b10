@@ -220,7 +220,8 @@ def send_recovery_email_to_address(
     subject = "Código de Recuperação de Senha"
     body = f"Seu código de recuperação é: {code}"
 
-    send_email(to_address, subject, body, db=db)
+    #send_email(to_address, subject, body, db=db)
+    print(f"Sending email to {to_address} with code {code}")
 
     # Persist using your existing CRUD
     crud.add_last_recovery_code(db, user, code)
