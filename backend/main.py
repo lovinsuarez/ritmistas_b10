@@ -13,7 +13,39 @@ import os
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Projeto Ritmistas B10 API v4")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+DEPLOYED_ORIGINS = [
+    # Your Flutter web on Render (add more if you have other frontends)
+    "https://ritmistas-b10-1.onrender.com",
+    "https://ritmistas-b10.onrender.com",  # if you also deploy with this name
+]
+
+# Optional: allow adding more origins via env (comma-separated)
+# Example:
+# CORS_EXTRA_ORIGINS="https://your-custom-domain.com,https://staging.example.com"
+extra = os.getenv("CORS_EXTRA_ORIGINS", "")
+EXTRA_ORIGINS = [o.strip() for o in extra.split(",") if o.strip()]
+
+ALLOWED_ORIGINS = DEPLOYED_ORIGINS + EXTRA_ORIGINS
+
+# Regex to allow common localhost variants with any port
+# Covers:
+# - http://localhost:xxxx
+# - http://127.0.0.1:xxxx
+# - http://0.0.0.0:xxxx
+# - http://[::1]:xxxx (IPv6)
+# And https variants if you ever use them locally
+LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=LOCALHOST_REGEX,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # --- AUTH ---
 @app.post("/auth/google", response_model=schemas.Token)
@@ -53,6 +85,36 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     if u.status == models.UserStatus.PENDING: raise HTTPException(403, "Conta pendente de aprovação do Admin Master.")
     token = security.create_access_token(data={"sub": u.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
     return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/auth/send-recovery-password-email")
+def send_recovery_email_endpoint(
+    to_address: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    from mailer import send_recovery_email_to_address
+
+    try:
+        send_recovery_email_to_address(db, to_address)
+        return {"detail": "OK"}
+    except ValueError as e:
+        if str(e) == "USER_NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        raise
+
+@app.post("/auth/recover-password")
+def recover_password_endpoint(data: schemas.RecoverPasswordRequest, db: Session = Depends(get_db)):
+    user = crud.get_user_by_email(db, data.email)
+    if not user:
+        raise HTTPException(404, "Usuário não encontrado.")
+
+    if not crud.check_recovery_code(db, user, data.code):
+        raise HTTPException(400, "Código inválido.")
+
+    crud.update_user_password(db, user, data.new_password)
+    crud.clear_recovery_code(db, user)
+
+    return {"detail": "Senha atualizada com sucesso."}
+
 
 # --- USER ---
 @app.get("/users/me", response_model=schemas.UserResponse)

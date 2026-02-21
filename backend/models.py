@@ -87,6 +87,7 @@ class User(Base):
     created_codes = relationship("RedeemCode", back_populates="creator", foreign_keys="[RedeemCode.created_by]")
     assigned_codes = relationship("RedeemCode", back_populates="assigned_user", foreign_keys="[RedeemCode.assigned_user_id]")
     general_redemptions = relationship("GeneralCodeRedemption", back_populates="user")
+    last_recovery_code = Column(String(20), nullable=True)
 
 class Activity(Base):
     __tablename__ = "activities"

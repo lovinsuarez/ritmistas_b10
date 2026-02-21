@@ -1,13 +1,13 @@
 // lib/pages/login_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:ritmistas_app/main.dart'; 
+import 'package:ritmistas_app/main.dart';
 import 'package:ritmistas_app/pages/home_page.dart' hide AppColors;
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart'; 
+import 'package:url_launcher/url_launcher.dart';
 
-enum AuthMode { login, registerUser, registerAdminMaster }
+enum AuthMode { login, registerUser, registerAdminMaster, forgotPassword }
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -25,6 +25,11 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
   final _inviteCodeController = TextEditingController();
+  // Controllers for forgot-password flow
+  final _forgotEmailController = TextEditingController();
+  final _forgotCodeController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   // --- LÓGICA DO GOOGLE ---
   Future<void> _handleGoogleLogin() async {
@@ -46,14 +51,15 @@ class _LoginPageState extends State<LoginPage> {
           rethrow;
         }
       }
-      
+
       final userData = await _apiService.getUsersMe(token);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('access_token', token);
       await prefs.setString('user_role', userData['role']);
 
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {
       _showError(e.toString());
@@ -85,7 +91,9 @@ class _LoginPageState extends State<LoginPage> {
         final err = e.toString();
         if (err.contains("Cadastro recebido") || err.contains("Pendente")) {
           // Cadastro criado e pendente
-          if (mounted) _showSuccess('Cadastro recebido! Aguarde aprovação do Admin Master.');
+          if (mounted)
+            _showSuccess(
+                'Cadastro recebido! Aguarde aprovação do Admin Master.');
           setState(() => _authMode = AuthMode.login);
           return;
         } else if (err.contains("NEED_INVITE_CODE")) {
@@ -103,7 +111,9 @@ class _LoginPageState extends State<LoginPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', token);
         await prefs.setString('user_role', userData['role']);
-        if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        if (mounted)
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {
       _showError(e.toString());
@@ -119,22 +129,29 @@ class _LoginPageState extends State<LoginPage> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: const Text("Código de Convite", style: TextStyle(color: Colors.white)),
+        title: const Text("Código de Convite",
+            style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Insira o código do sistema (B10-XXXX).", style: TextStyle(color: Colors.white70)),
+            const Text("Insira o código do sistema (B10-XXXX).",
+                style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             TextField(
               controller: ctrl,
               style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: "Código", border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: "Código", border: OutlineInputBorder()),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, null), child: const Text("Cancelar")),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text("Confirmar"))
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text("Cancelar")),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text("Confirmar"))
         ],
       ),
     );
@@ -156,7 +173,8 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('user_role', userData['role']);
 
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {
       _showError(e.toString());
@@ -168,20 +186,26 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _handleRegister() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    
+
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
       final username = _usernameController.text.trim();
 
-      if (email.isEmpty || password.isEmpty || username.isEmpty) throw Exception("Preencha tudo.");
+      if (email.isEmpty || password.isEmpty || username.isEmpty)
+        throw Exception("Preencha tudo.");
 
       if (_authMode == AuthMode.registerAdminMaster) {
-        await _apiService.registerAdminMaster(email: email, password: password, username: username);
+        await _apiService.registerAdminMaster(
+            email: email, password: password, username: username);
       } else {
         final inviteCode = _inviteCodeController.text.trim();
         if (inviteCode.isEmpty) throw Exception("Código obrigatório.");
-        await _apiService.registerUser(email: email, password: password, username: username, inviteCode: inviteCode);
+        await _apiService.registerUser(
+            email: email,
+            password: password,
+            username: username,
+            inviteCode: inviteCode);
       }
 
       if (mounted) {
@@ -197,18 +221,190 @@ class _LoginPageState extends State<LoginPage> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message.replaceAll("Exception: ", "")), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message.replaceAll("Exception: ", "")),
+        backgroundColor: Colors.red));
   }
 
   void _showSuccess(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green));
   }
 
   void _switchAuthMode(AuthMode newMode) {
     setState(() {
       _authMode = newMode;
     });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _usernameController.dispose();
+    _inviteCodeController.dispose();
+    _forgotEmailController.dispose();
+    _forgotCodeController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    _forgotEmailController.text = _emailController.text.trim();
+    bool sent = false;
+    bool loading = false;
+    String? error;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardBackground,
+          title: const Text('Recuperar Senha',
+              style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!sent) ...[
+                TextField(
+                  controller: _forgotEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                      labelText: 'Email', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                if (error != null)
+                  Text(error!, style: const TextStyle(color: Colors.red)),
+              ] else ...[
+                Text('Código enviado para ${_forgotEmailController.text}',
+                    style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _forgotCodeController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                      labelText: 'Código de recuperação',
+                      border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _newPasswordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                      labelText: 'Nova senha', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                      labelText: 'Confirmar nova senha',
+                      border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 8),
+                if (error != null)
+                  Text(error!, style: const TextStyle(color: Colors.red)),
+              ]
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Cancelar')),
+            if (!sent)
+              ElevatedButton(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final email = _forgotEmailController.text.trim();
+                          if (email.isEmpty) {
+                            setState(() => error = 'Informe o email');
+                            return;
+                          }
+                          setState(() {
+                            loading = true;
+                            error = null;
+                          });
+                          try {
+                            await _apiService.sendRecoveryEmail(email);
+                            setState(() {
+                              sent = true;
+                              loading = false;
+                            });
+                          } catch (e) {
+                            setState(() {
+                              error =
+                                  e.toString().replaceAll('Exception: ', '');
+                              loading = false;
+                            });
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Enviar código'))
+            else
+              ElevatedButton(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final code = _forgotCodeController.text.trim();
+                          final p1 = _newPasswordController.text;
+                          final p2 = _confirmPasswordController.text;
+                          if (code.isEmpty) {
+                            setState(() => error = 'Informe o código');
+                            return;
+                          }
+                          if (p1.isEmpty || p2.isEmpty) {
+                            setState(() => error = 'Preencha as senhas');
+                            return;
+                          }
+                          if (p1 != p2) {
+                            setState(() => error = 'Senhas não conferem');
+                            return;
+                          }
+                          setState(() {
+                            loading = true;
+                            error = null;
+                          });
+                          try {
+                            await _apiService.recoverPassword(
+                                _forgotEmailController.text.trim(), code, p1);
+                            Navigator.pop(ctx);
+                            if (mounted)
+                              _showSuccess(
+                                  'Senha atualizada com sucesso. Faça login.');
+                            setState(() {});
+                          } catch (e) {
+                            setState(() {
+                              error =
+                                  e.toString().replaceAll('Exception: ', '');
+                              loading = false;
+                            });
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Alterar senha'))
+          ],
+        );
+      }),
+    );
   }
 
   @override
@@ -225,14 +421,28 @@ class _LoginPageState extends State<LoginPage> {
         subtitle = "Faça login para acessar sua conta.";
         btnText = "ENTRAR";
         fields = [
-          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+          _buildTextField(_emailController, 'Email', Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline,
+              obscureText: true),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _isLoading ? null : _showForgotPasswordDialog,
+              child: const Text('Esqueci a senha'),
+            ),
+          ),
         ];
         footer = Column(
           children: [
-            TextButton(onPressed: () => _switchAuthMode(AuthMode.registerUser), child: const Text("Não tem conta? Cadastre-se")),
-            TextButton(onPressed: () => _switchAuthMode(AuthMode.registerAdminMaster), child: const Text("Sou Admin Master")),
+            TextButton(
+                onPressed: () => _switchAuthMode(AuthMode.registerUser),
+                child: const Text("Não tem conta? Cadastre-se")),
+            TextButton(
+                onPressed: () => _switchAuthMode(AuthMode.registerAdminMaster),
+                child: const Text("Sou Admin Master")),
           ],
         );
         break;
@@ -242,15 +452,21 @@ class _LoginPageState extends State<LoginPage> {
         subtitle = "Junte-se à bateria.";
         btnText = "REGISTRAR";
         fields = [
-          _buildTextField(_usernameController, 'Seu Nome', Icons.person_outline),
+          _buildTextField(
+              _usernameController, 'Seu Nome', Icons.person_outline),
           const SizedBox(height: 16),
-          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+          _buildTextField(_emailController, 'Email', Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline,
+              obscureText: true),
           const SizedBox(height: 16),
-          _buildTextField(_inviteCodeController, 'Código de Convite (B10-...)', Icons.vpn_key_outlined),
+          _buildTextField(_inviteCodeController, 'Código de Convite (B10-...)',
+              Icons.vpn_key_outlined),
         ];
-        footer = TextButton(onPressed: () => _switchAuthMode(AuthMode.login), child: const Text("Já tem conta? Faça Login"));
+        footer = TextButton(
+            onPressed: () => _switchAuthMode(AuthMode.login),
+            child: const Text("Já tem conta? Faça Login"));
         break;
 
       case AuthMode.registerAdminMaster:
@@ -258,13 +474,32 @@ class _LoginPageState extends State<LoginPage> {
         subtitle = "Registro administrativo.";
         btnText = "CRIAR ADMIN";
         fields = [
-          _buildTextField(_usernameController, 'Seu Nome', Icons.person_outline),
+          _buildTextField(
+              _usernameController, 'Seu Nome', Icons.person_outline),
           const SizedBox(height: 16),
-          _buildTextField(_emailController, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+          _buildTextField(_emailController, 'Email', Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField(_passwordController, 'Senha', Icons.lock_outline, obscureText: true),
+          _buildTextField(_passwordController, 'Senha', Icons.lock_outline,
+              obscureText: true),
         ];
-        footer = TextButton(onPressed: () => _switchAuthMode(AuthMode.login), child: const Text("Cancelar"));
+        footer = TextButton(
+            onPressed: () => _switchAuthMode(AuthMode.login),
+            child: const Text("Cancelar"));
+        break;
+
+      case AuthMode.forgotPassword:
+        title = "Esqueci a Senha";
+        subtitle = "Recuperar acesso à conta.";
+        btnText = "Receber email";
+        fields = [
+          _buildTextField(_emailController, 'Email', Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress),
+          const SizedBox(height: 16),
+        ];
+        footer = TextButton(
+            onPressed: () => _switchAuthMode(AuthMode.login),
+            child: const Text("Cancelar"));
         break;
     }
 
@@ -274,10 +509,18 @@ class _LoginPageState extends State<LoginPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("Desenvolvido por ", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Text("Desenvolvido por ",
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
             InkWell(
-              onTap: () => launchUrl(Uri.parse("https://www.instagram.com/dual.forge/")), 
-              child: Text("DUALFORGE", style: TextStyle(color: AppColors.primaryYellow.withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 12, decoration: TextDecoration.underline, decorationColor: AppColors.primaryYellow)),
+              onTap: () =>
+                  launchUrl(Uri.parse("https://www.instagram.com/dual.forge/")),
+              child: Text("DUALFORGE",
+                  style: TextStyle(
+                      color: AppColors.primaryYellow.withOpacity(0.8),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      decoration: TextDecoration.underline,
+                      decorationColor: AppColors.primaryYellow)),
             ),
           ],
         ),
@@ -295,12 +538,16 @@ class _LoginPageState extends State<LoginPage> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.9), Colors.black],
+                  colors: [
+                    Colors.black.withOpacity(0.1),
+                    Colors.black.withOpacity(0.9),
+                    Colors.black
+                  ],
                 ),
               ),
             ),
           ),
-          
+
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -311,55 +558,97 @@ class _LoginPageState extends State<LoginPage> {
                   // LOGO
                   Center(
                     child: Container(
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primaryYellow, width: 2), boxShadow: [BoxShadow(color: AppColors.primaryYellow.withOpacity(0.2), blurRadius: 20)]),
+                      decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppColors.primaryYellow, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                                color: AppColors.primaryYellow.withOpacity(0.2),
+                                blurRadius: 20)
+                          ]),
                       child: ClipOval(
                         child: Image.network(
                           'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logob10.png',
-                          height: 120, width: 120, fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => const Icon(Icons.music_note, size: 80, color: AppColors.primaryYellow),
+                          height: 120,
+                          width: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => const Icon(
+                              Icons.music_note,
+                              size: 80,
+                              color: AppColors.primaryYellow),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
-                  Text(title, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primaryYellow, letterSpacing: 1.5), textAlign: TextAlign.center),
+
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryYellow,
+                          letterSpacing: 1.5),
+                      textAlign: TextAlign.center),
                   const SizedBox(height: 8),
-                  Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 16), textAlign: TextAlign.center),
+                  Text(subtitle,
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 16),
+                      textAlign: TextAlign.center),
                   const SizedBox(height: 40),
-                  
+
                   ...fields,
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // BOTÃO DE AÇÃO PRINCIPAL
                   SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : (_authMode == AuthMode.login ? _handleLogin : _handleRegister),
-                      style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      child: _isLoading ? const CircularProgressIndicator(color: Colors.black) : Text(btnText),
+                      onPressed: _isLoading
+                          ? null
+                          : (_authMode == AuthMode.login
+                              ? _handleLogin
+                              : _handleRegister),
+                      style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.black)
+                          : Text(btnText),
                     ),
                   ),
-                  
+
                   // BOTÃO GOOGLE: disponível no Login e no Registro (usa flows distintos)
-                  if (_authMode == AuthMode.login || _authMode == AuthMode.registerUser) ...[
+                  if (_authMode == AuthMode.login ||
+                      _authMode == AuthMode.registerUser) ...[
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 50,
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                        ),
-                        icon: Image.network('https://cdn-icons-png.flaticon.com/512/2991/2991148.png', height: 24),
-                        label: Text(_authMode == AuthMode.login ? "Entrar com Google" : "Cadastrar com Google", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        onPressed: _isLoading ? null : (_authMode == AuthMode.login ? _handleGoogleLogin : _handleGoogleRegister),
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))),
+                        icon: Image.network(
+                            'https://cdn-icons-png.flaticon.com/512/2991/2991148.png',
+                            height: 24),
+                        label: Text(
+                            _authMode == AuthMode.login
+                                ? "Entrar com Google"
+                                : "Cadastrar com Google",
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
+                        onPressed: _isLoading
+                            ? null
+                            : (_authMode == AuthMode.login
+                                ? _handleGoogleLogin
+                                : _handleGoogleRegister),
                       ),
                     )
                   ],
-                  
+
                   const SizedBox(height: 24),
                   footer,
                   const SizedBox(height: 40),
@@ -372,7 +661,9 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {bool obscureText = false, TextInputType? keyboardType}) {
+  Widget _buildTextField(
+      TextEditingController controller, String hint, IconData icon,
+      {bool obscureText = false, TextInputType? keyboardType}) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -382,9 +673,13 @@ class _LoginPageState extends State<LoginPage> {
         hintText: hint,
         prefixIcon: Icon(icon, color: Colors.white70),
         filled: true,
-        fillColor: const Color(0xFF2C2C2C), 
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primaryYellow)),
+        fillColor: const Color(0xFF2C2C2C),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primaryYellow)),
       ),
     );
   }
