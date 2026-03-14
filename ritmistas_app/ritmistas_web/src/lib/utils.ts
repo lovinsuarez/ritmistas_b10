@@ -20,9 +20,11 @@ export function formatDateTime(dateStr: string): string {
   });
 }
 
-export function getInitials(name: string): string {
+export function getInitials(name?: string): string {
+  if (!name) return '??';
   return name
     .split(' ')
+    .filter(Boolean)
     .map((w) => w[0])
     .join('')
     .toUpperCase()

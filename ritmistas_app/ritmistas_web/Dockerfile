@@ -13,8 +13,12 @@ COPY . .
 # Learn more here: https://nextjs.org/telemetry
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Note: We assume environment variables are passed at build time if needed for the FE build
-# or provided at runtime if the app is designed to handle them.
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_LAUNCHPAD_URL
+
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_LAUNCHPAD_URL=$NEXT_PUBLIC_LAUNCHPAD_URL
+
 RUN npm run build
 
 FROM node:20-bookworm-slim AS runner

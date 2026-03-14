@@ -152,7 +152,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-            <div><span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)' }}>Nome: </span>{profile.username}</div>
+            <div><span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)' }}>Nome: </span>{profile.first_name ? `${profile.first_name} ${profile.last_name || ''}` : profile.username}</div>
             <div><span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)' }}>Apelido: </span>{profile.nickname || '—'}</div>
             <div><span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)' }}>Email: </span>{profile.email}</div>
             {profile.birth_date && <div><span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)' }}>Nascimento: </span>{formatDate(profile.birth_date)}</div>}

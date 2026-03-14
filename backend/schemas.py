@@ -9,6 +9,33 @@ class BaseConfig(BaseModel):
 
 # ... (Token schemas) ...
 
+class Token(BaseConfig):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    email: str | None = None
+    password: str | None = None
+
+class Badge(BaseConfig):
+    badge_id: int
+    name: str
+    description: str | None = None
+    icon_url: str | None = None
+    created_at: datetime
+
+class BadgeCreate(BaseConfig):
+    name: str
+    description: str | None = None
+    icon_url: str | None = None
+
+class UserBadge(BaseConfig):
+    id: int
+    user_id: int
+    badge_id: int
+    awarded_at: datetime
+    badge: Badge
+
 # User
 class UserBase(BaseConfig):
     email: EmailStr
@@ -37,8 +64,8 @@ class UserSectorPoints(BaseConfig):
     points: int
 
 class User(UserBase):
-    user_id_int: int = Field(alias="user_id", validation_alias="user_id", serialization_alias="user_id") # Internal DB ID
-    user_id: uuid.UUID = Field(alias="external_id", validation_alias="external_id", serialization_alias="user_id") # Ecosystem UUID
+    user_id_db: int = Field(alias="user_id", validation_alias="user_id") # Internal DB ID
+    user_id: uuid.UUID = Field(alias="external_id", validation_alias="external_id") # Ecosystem UUID
     role: UserRole 
     status: UserStatus
     full_name: str | None = None # Computed
@@ -60,7 +87,7 @@ class User(UserBase):
             self.full_name = self.username # Fallback for old users or missing names
         return self
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True, populate_by_name=True)
 
 # Outros
 class Sector(BaseConfig):

@@ -38,3 +38,13 @@ def create_admin_general_code(d: schemas.CodeCreateGeneral, db: Session = Depend
 @router.get("/codes/general", response_model=List[schemas.CodeDetail])
 def get_admin_codes(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
     return crud.get_general_codes(db)
+
+@router.post("/sync-ecosystem")
+def sync_with_ecosystem(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
+    """
+    Sincroniza setores e membros a partir do zoom-board do ecossistema.
+    """
+    stats = crud.sync_departments_and_members(db)
+    if "error" in stats:
+        raise HTTPException(status_code=500, detail=stats["error"])
+    return stats

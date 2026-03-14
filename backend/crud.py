@@ -1,12 +1,11 @@
-from sqlalchemy import func, extract, desc
-from sqlalchemy.orm import Session
 import models, schemas, security
-import csv
-import io
-from datetime import datetime
-import random
-import string
-import secrets # Para gerar senha aleatória
+from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_, desc
+import secrets
+import uuid
+import json
+import urllib.request
+import os
 
 
 def login_with_google(db: Session, google_data: schemas.GoogleLoginRequest):
@@ -372,6 +371,186 @@ def update_user_profile(db: Session, user: models.User, data: schemas.UserUpdate
     if data.birth_date: user.birth_date = data.birth_date
     if data.profile_pic: user.profile_pic = data.profile_pic
     db.commit(); db.refresh(user); return user
+
+def sync_user_with_ecosystem(db: Session, payload: dict, token: str = None):
+    """
+    Sincroniza os dados do usuário com base no payload do JWT do ecossistema.
+    Cria o usuário se não existir.
+    """
+    external_id = payload.get("sub")
+    email = payload.get("email")
+    
+    if not external_id or not email:
+        return None
+
+    # Tenta obter pelo ID externo
+    try:
+        uuid_val = uuid.UUID(external_id) if isinstance(external_id, str) else external_id
+        user = db.query(models.User).filter(models.User.external_id == uuid_val).first()
+    except (ValueError, AttributeError):
+        return None
+
+    # Se não achou por UUID, tenta pelo email
+    if not user:
+        user = get_user_by_email(db, email)
+        if user:
+            user.external_id = uuid_val # Vincula o UUID se achou por email
+
+    # Se ainda não existe, cria um novo usuário
+    if not user:
+        random_pass = secrets.token_urlsafe(24)
+        hashed = security.get_password_hash(random_pass)
+        
+        user = models.User(
+            external_id=uuid_val,
+            email=email,
+            username=email.split('@')[0], 
+            hashed_password=hashed,
+            status=models.UserStatus.ACTIVE,
+            role=models.UserRole.user,
+            nickname=email.split('@')[0]
+        )
+        db.add(user)
+    
+    # 1. Atualiza permissões do Ecosystem se presentes no token
+    eco_role = payload.get("ecosystem_role")
+    if eco_role == "admin":
+        user.role = models.UserRole.admin
+    elif eco_role == "leader":
+        user.role = models.UserRole.lider
+
+    # 2. Extract detailed profile enrichment to be handled by /me
+    db.commit()
+    db.refresh(user)
+    return user
+
+def sync_current_user_profile(db: Session, user: models.User, token: str):
+    """
+    Sincroniza o perfil detalhado do usuário logado (nome, foto) usando a API do ecossistema.
+    E também localiza o setor do usuário no organograma (zoom-board) para atrelá-lo.
+    """
+    user_service_url = os.getenv("USER_SERVICE_URL", "http://localhost:8000")
+    
+    # Enrich simple profile data
+    try:
+        req = urllib.request.Request(f"{user_service_url}/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.getcode() == 200:
+                data = json.loads(response.read().decode())
+                if data.get("full_name") and not (user.first_name or user.last_name):
+                    parts = data["full_name"].split(" ", 1)
+                    user.first_name = parts[0]
+                    user.last_name = parts[1] if len(parts) > 1 else ""
+                if data.get("photo_url"):
+                    user.profile_pic = data["photo_url"]
+                if data.get("username") and user.username == user.email.split('@')[0]:
+                    user.username = data["username"]
+    except Exception as e:
+        print(f"Failed to enrich user data: {e}")
+
+    # Ensure user has a sector assigned
+    if not user.sector_id:
+        zoom_url = f"{user_service_url}/api/v1/views/zoom-board?include=members&depth=5"
+        try:
+            with urllib.request.urlopen(zoom_url, timeout=5) as response:
+                if response.getcode() == 200:
+                    data = json.loads(response.read().decode())
+                    departments = data.get("departments", [])
+                    
+                    def find_user_sector(depts):
+                        for dept in depts:
+                            for member in dept.get("members", []):
+                                if member.get("id") == str(user.external_id):
+                                    return dept.get("name")
+                            found = find_user_sector(dept.get("children", []))
+                            if found:
+                                return found
+                        return None
+                    
+                    sector_name = find_user_sector(departments)
+                    if sector_name:
+                        sector = db.query(models.Sector).filter(models.Sector.name == sector_name).first()
+                        if not sector:
+                            sector = models.Sector(name=sector_name, invite_code=secrets.token_hex(4).upper())
+                            db.add(sector)
+                            db.flush()
+                        user.sector_id = sector.sector_id
+        except Exception as e:
+            print(f"Failed to find user in zoom-board: {e}")
+
+    db.commit()
+    db.refresh(user)
+    return user
+def sync_departments_and_members(db: Session):
+    """
+    Consome o endpoint zoom-board e sincroniza setores e membros.
+    """
+    user_service_url = os.getenv("USER_SERVICE_URL", "http://localhost:8000")
+    zoom_url = f"{user_service_url}/api/v1/views/zoom-board?include=members&depth=5"
+    
+    try:
+        with urllib.request.urlopen(zoom_url, timeout=10) as response:
+            if response.getcode() != 200:
+                return {"error": f"User service returned {response.getcode()}"}
+            data = json.loads(response.read().decode())
+    except Exception as e:
+        return {"error": str(e)}
+
+    departments = data.get("departments", [])
+    stats = {"sectors_created": 0, "members_synced": 0}
+
+    def process_dept(dept, parent_sector_id=None):
+        dept_id = dept.get("id")
+        name = dept.get("name")
+        
+        # 1. Sync Sector
+        sector = db.query(models.Sector).filter(models.Sector.name == name).first()
+        if not sector:
+            sector = models.Sector(name=name, invite_code=secrets.token_hex(4).upper())
+            db.add(sector)
+            db.flush()
+            stats["sectors_created"] += 1
+        
+        # 2. Sync Members
+        for member in dept.get("members", []):
+            ext_id = member.get("id")
+            display_name = member.get("display_name")
+            
+            # Find or partial create user
+            try:
+                u_id = uuid.UUID(ext_id)
+                user = db.query(models.User).filter(models.User.external_id == u_id).first()
+                if not user:
+                    # Partial record, email placeholder until they login
+                    user = models.User(
+                        external_id=u_id,
+                        username=display_name.lower().replace(" ", "."),
+                        email=f"{ext_id}@ecosystem.local",
+                        hashed_password=security.get_password_hash(secrets.token_urlsafe(16)),
+                        status=models.UserStatus.ACTIVE,
+                        role=models.UserRole.user,
+                        nickname=display_name
+                    )
+                    db.add(user)
+                    db.flush()
+                
+                # Assign to sector (if not already assigned or needs update)
+                # In Ritmistas, Sector is currently 1 per user or a relationship
+                # Let's check models.py for User relationship to Sector
+                user.sector_id = sector.sector_id
+                stats["members_synced"] += 1
+            except Exception as e:
+                print(f"Error syncing member {ext_id}: {e}")
+
+        # 3. Recursive children
+        for child in dept.get("children", []):
+            process_dept(child, sector.sector_id)
+
+    for d in departments:
+        process_dept(d)
+
+    db.commit()
+    return stats
 
 def get_activities_by_sector(db: Session, sector_id: int):
     sector = get_sector_by_id(db, sector_id)

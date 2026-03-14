@@ -449,3 +449,11 @@ export async function getAdminGeneralCodes(token: string): Promise<CodeDetail[]>
   });
   return handleResponse<CodeDetail[]>(res);
 }
+
+export async function syncEcosystemData(token: string): Promise<{ sectors_created: number; members_synced: number }> {
+  const res = await fetch(`${BASE_URL}/admin/sync-ecosystem`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  return handleResponse(res);
+}

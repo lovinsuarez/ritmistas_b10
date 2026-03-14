@@ -11,6 +11,7 @@ import schemas # Importa os schemas que criamos
 
 # NOVO: Importar os modelos User e UserRole
 from models import User, UserRole
+import uuid
 
 # --- Configuração de Autenticação ---
 
@@ -80,24 +81,22 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def decode_token(token: str) -> schemas.TokenData | None:
+def decode_token(token: str) -> dict | None:
     """Decodifica um token, validando-o."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            return None
-        return schemas.TokenData(email=email)
+        # Ecosystem Standard: 'sub' is the UUID. 'email' is explicitly in payload or same as sub (for old accounts).
+        return payload
     except JWTError:
         return None
 
 def get_current_user(
     token: str = Depends(oauth2_scheme), 
     db: Session = Depends(database.get_db)
-) -> User: # ALTERADO: Adicionado o tipo de retorno '-> User' para clareza
+) -> User:
     """
     Dependência para obter o usuário logado atualmente.
-    Decodifica o token, busca o usuário no banco e o retorna.
+    Decodifica o token, busca o usuário no banco (UUID preferencialmente) e o retorna.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -105,13 +104,41 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    token_data = decode_token(token)
-    if token_data is None or token_data.email is None:
+    payload = decode_token(token)
+    if payload is None:
         raise credentials_exception
 
-    user = crud.get_user_by_email(db, email=token_data.email)
-    if user is None:
+    external_id = payload.get("sub")
+    email = payload.get("email")
+
+    if not external_id and not email:
         raise credentials_exception
+
+    # 1. Tentar achar pelo External ID (UUID)
+    user = None
+    if external_id:
+        try:
+            uuid_val = uuid.UUID(external_id) if isinstance(external_id, str) else external_id
+            user = db.query(User).filter(User.external_id == uuid_val).first()
+        except (ValueError, AttributeError):
+            pass
+
+    # 2. Tentar achar pelo Email se não achou pelo UUID
+    if not user and email:
+        user = crud.get_user_by_email(db, email=email)
+        if user and external_id:
+            # Sync UUID se achou por email
+            user.external_id = external_id
+            db.commit()
+            db.refresh(user)
+
+    # 3. Se ainda não existe, cria/sync com dados do Ecosystem (Lazy Sync)
+    if not user:
+        # Aqui podemos chamar uma função que cria o usuário "on the fly" 
+        # se o token for válido e vier do userService/Launchpad
+        user = crud.sync_user_with_ecosystem(db, payload, token)
+        if not user:
+            raise credentials_exception
 
     return user
 

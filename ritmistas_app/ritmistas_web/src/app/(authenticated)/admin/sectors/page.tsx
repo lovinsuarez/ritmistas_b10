@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
-import { getAllSectors, createSector, getAllLiders, assignLiderToSector, getUsersForSector } from '@/lib/api';
+import { getAllSectors, createSector, getAllLiders, assignLiderToSector, getUsersForSector, syncEcosystemData } from '@/lib/api';
 import type { Sector, UserAdminView } from '@/lib/types';
 
 export default function AdminSectorsPage() {
@@ -12,12 +12,28 @@ export default function AdminSectorsPage() {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
   const [message, setMessage] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const [expandedSector, setExpandedSector] = useState<number | null>(null);
   const [sectorUsers, setSectorUsers] = useState<UserAdminView[]>([]);
   const [sectorUsersLoading, setSectorUsersLoading] = useState(false);
 
   const load = () => { if (!token) return; setLoading(true); Promise.all([getAllSectors(token), getAllLiders(token)]).then(([s, l]) => { setSectors(s); setLiders(l); }).catch(() => {}).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, [token]); // eslint-disable-line
+
+  const handleSync = async () => {
+    if (!token) return;
+    setSyncing(true);
+    try {
+      const stats = await syncEcosystemData(token);
+      setMessage(`Sincronização concluída! Setores: ${stats.sectors_created}, Membros: ${stats.members_synced}`);
+      load();
+      setTimeout(() => setMessage(''), 5000);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Erro na sincronização');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!token || !newName.trim()) return;
@@ -43,8 +59,14 @@ export default function AdminSectorsPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 800, marginBottom: 'var(--space-lg)' }}>🏢 Setores</h1>
-      {message && <div className="alert alert-success" style={{ marginBottom: 'var(--space-md)' }}>{message}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
+        <h1 style={{ fontSize: 'var(--font-xl)', fontWeight: 800, margin: 0 }}>🏢 Setores</h1>
+        <button className="btn btn-ghost btn-sm" onClick={handleSync} disabled={syncing}>
+          {syncing ? 'Sincronizando...' : '🔄 Sincronizar com Ecossistema'}
+        </button>
+      </div>
+
+      {message && <div className={`alert ${message.includes('Erro') ? 'alert-error' : 'alert-success'}`} style={{ marginBottom: 'var(--space-md)' }}>{message}</div>}
 
       {/* Create */}
       <div className="card" style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-lg)', alignItems: 'end' }}>

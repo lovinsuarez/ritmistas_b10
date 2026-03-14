@@ -93,6 +93,8 @@ export interface UserProfile {
   role: string;
   status: string;
   nickname?: string;
+  first_name?: string;
+  last_name?: string;
   profile_pic?: string;
   birth_date?: string;
   total_points?: number;

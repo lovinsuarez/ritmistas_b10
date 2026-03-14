@@ -10,16 +10,10 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Projeto Ritmistas B10 API v5")
 
 # CORS Configuration
-DEPLOYED_ORIGINS = [
-    "https://ritmistas-b10-1.onrender.com",
-    "https://ritmistas-b10.onrender.com",
-]
+allowed_origins_env = os.getenv("RITMISTAS_CORS_ORIGINS", "")
+ALLOWED_ORIGINS = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 
-extra = os.getenv("CORS_EXTRA_ORIGINS", "")
-EXTRA_ORIGINS = [o.strip() for o in extra.split(",") if o.strip()]
-ALLOWED_ORIGINS = DEPLOYED_ORIGINS + EXTRA_ORIGINS
-
-LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$"
+LOCALHOST_REGEX = r"^https?://([a-z0-9-]+\.)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$"
 
 app.add_middleware(
     CORSMiddleware,
