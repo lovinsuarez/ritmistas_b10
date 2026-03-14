@@ -16,15 +16,8 @@ import 'package:ritmistas_app/pages/admin_master_ranking_page.dart';
 import 'package:ritmistas_app/pages/admin_master_pontos_page.dart';
 import 'package:ritmistas_app/pages/admin_master_badges_page.dart';
 import 'package:ritmistas_app/pages/admin_master_convites_page.dart';
+import 'package:ritmistas_app/theme.dart';
 
-
-class AppColors {
-  static const Color background = Color(0xFF121212); // Preto fundo
-  static const Color cardBackground = Color(0xFF1E1E1E); // Cinza escuro cards
-  static const Color primaryYellow = Color(0xFFFFD700); // Amarelo Ouro
-  static const Color textWhite = Colors.white;
-  static const Color textGrey = Colors.grey;
-}
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -50,7 +43,7 @@ class _HomePageState extends State<HomePage> {
 
     final navigator = Navigator.of(context, rootNavigator: true);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Limpa token e role
+    await prefs.clear();
     navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginPage()),
       (route) => false,
@@ -63,11 +56,15 @@ class _HomePageState extends State<HomePage> {
       future: _userRoleFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.primaryGold),
+            ),
+          );
         }
 
         if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-          // Se der erro, força o logout seguro
           WidgetsBinding.instance.addPostFrameCallback((_) => _handleLogout());
           return const Scaffold(body: Center(child: Text("Erro de autenticação.")));
         }
@@ -91,20 +88,31 @@ Widget _buildAppBarTitle(String title) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      ClipOval(
-        child: Image.network(
-          'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logoB10.png',
-          height: 30,
-          width: 30,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => const Icon(Icons.music_note, color: Colors.yellow),
+      Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: AppShadows.glow(AppColors.primaryGold, intensity: 0.2),
+        ),
+        child: ClipOval(
+          child: Image.network(
+            'https://raw.githubusercontent.com/lovinsuarez/ritmistas_b10/main/ritmistas_app/assets/images/logoB10.png',
+            height: 30,
+            width: 30,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.music_note, color: AppColors.primaryGold),
+          ),
         ),
       ),
-      const SizedBox(width: 8),
+      const SizedBox(width: 10),
       Flexible(
         child: Text(
           title,
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
           overflow: TextOverflow.ellipsis,
         ),
       ),

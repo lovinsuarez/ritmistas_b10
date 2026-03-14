@@ -31,6 +31,8 @@ def login_with_google(db: Session, google_data: schemas.GoogleLoginRequest):
     new_user = models.User(
         email=google_data.email,
         username=google_data.username,
+        first_name=google_data.first_name,
+        last_name=google_data.last_name,
         hashed_password=hashed,
         role=models.UserRole.user,
         status=models.UserStatus.PENDING, # Pendente de aprovação
@@ -69,7 +71,15 @@ def validate_system_invite(db: Session, code: str):
 
 def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     hashed_password = security.get_password_hash(admin_data.password)
-    db_admin = models.User(email=admin_data.email, username=admin_data.username, hashed_password=hashed_password, role=models.UserRole.admin, status=models.UserStatus.ACTIVE)
+    db_admin = models.User(
+        email=admin_data.email, 
+        username=admin_data.username, 
+        first_name=admin_data.first_name,
+        last_name=admin_data.last_name,
+        hashed_password=hashed_password, 
+        role=models.UserRole.admin, 
+        status=models.UserStatus.ACTIVE
+    )
     db.add(db_admin); db.commit(); db.refresh(db_admin)
     return db_admin
 
@@ -77,7 +87,15 @@ def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
     invite = validate_system_invite(db, code=user_data.invite_code)
     if not invite: return None 
     hashed_password = security.get_password_hash(user_data.password)
-    db_user = models.User(email=user_data.email, username=user_data.username, hashed_password=hashed_password, role=models.UserRole.user, status=models.UserStatus.PENDING)
+    db_user = models.User(
+        email=user_data.email, 
+        username=user_data.username, 
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        hashed_password=hashed_password, 
+        role=models.UserRole.user, 
+        status=models.UserStatus.PENDING
+    )
     db.add(db_user); db.commit(); db.refresh(db_user)
     return db_user
 
@@ -347,6 +365,9 @@ def get_pending_users_by_sector(db: Session, sector_id: int): return []
 def update_user_status(db: Session, user: models.User, status: models.UserStatus):
     user.status = status; db.commit(); db.refresh(user); return user
 def update_user_profile(db: Session, user: models.User, data: schemas.UserUpdateProfile):
+    if data.username: user.username = data.username
+    if data.first_name: user.first_name = data.first_name
+    if data.last_name: user.last_name = data.last_name
     if data.nickname: user.nickname = data.nickname
     if data.birth_date: user.birth_date = data.birth_date
     if data.profile_pic: user.profile_pic = data.profile_pic

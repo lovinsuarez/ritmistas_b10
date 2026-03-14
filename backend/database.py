@@ -6,33 +6,27 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# --- CORREÇÃO: URL DIRETA (SEM OS.GETENV ERRADO) ---
-# Isso garante que ele vai conectar no Render e não no local.
-DATABASE_URL = "postgresql://ritmistas_db_5g2x_user:RPVMbo5QTPPc3YX7ZIUpqZA19ZclSC6C@dpg-d6ck7fvgi27c7382jl6g-a/ritmistas_db_5g2x"
+# --- CONFIGURATION FROM ENVIRONMENT ---
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./dev.db")
 
-# Fallback de segurança apenas se a string acima estiver vazia (o que não vai acontecer)
-if not DATABASE_URL:
-    logger.warning("DATABASE_URL não definido — usando fallback sqlite local (./dev.db)")
-    DATABASE_URL = "sqlite:///./dev.db"
-
-# Corrige o prefixo para versões novas do SQLAlchemy (postgres:// -> postgresql://)
+# Automatically fix "postgres://" -> "postgresql://" for SQLAlchemy
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# O Render exige conexão segura (SSL), então forçamos aqui se for Postgres
-if DATABASE_URL.startswith("postgresql://") and "sslmode" not in DATABASE_URL:
-    if "?" in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL + "&sslmode=require"
-    else:
-        DATABASE_URL = DATABASE_URL + "?sslmode=require"
+# Configuration for Engine
+engine_args = {}
 
-# Configuração da Engine
 if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    engine_args["connect_args"] = {"check_same_thread": False}
 else:
-    # pool_pre_ping ajuda a manter a conexão ativa no Render
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    # Production-ready PostgreSQL settings
+    engine_args.update({
+        "pool_pre_ping": True,
+        "pool_size": 20,
+        "max_overflow": 10,
+    })
 
+engine = create_engine(DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

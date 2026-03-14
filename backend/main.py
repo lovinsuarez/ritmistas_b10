@@ -1,40 +1,24 @@
-# C:\Users\jeatk\OneDrive\Documents\GitHub\ritimistas_b10\backend\main.py
-from fastapi import FastAPI, Depends, HTTPException, status, Body, Query, Header
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import timedelta
-from typing import List, Optional
-import io
-import crud, models, schemas, security
-from database import engine, get_db
+from database import engine, Base
+from routers import auth, users, sectors, ranking, activities, admin
 import os
 
-models.Base.metadata.create_all(bind=engine)
-app = FastAPI(title="Projeto Ritmistas B10 API v4")
+# Create tables
+Base.metadata.create_all(bind=engine)
 
+app = FastAPI(title="Projeto Ritmistas B10 API v5")
+
+# CORS Configuration
 DEPLOYED_ORIGINS = [
-    # Your Flutter web on Render (add more if you have other frontends)
     "https://ritmistas-b10-1.onrender.com",
-    "https://ritmistas-b10.onrender.com",  # if you also deploy with this name
+    "https://ritmistas-b10.onrender.com",
 ]
 
-# Optional: allow adding more origins via env (comma-separated)
-# Example:
-# CORS_EXTRA_ORIGINS="https://your-custom-domain.com,https://staging.example.com"
 extra = os.getenv("CORS_EXTRA_ORIGINS", "")
 EXTRA_ORIGINS = [o.strip() for o in extra.split(",") if o.strip()]
-
 ALLOWED_ORIGINS = DEPLOYED_ORIGINS + EXTRA_ORIGINS
 
-# Regex to allow common localhost variants with any port
-# Covers:
-# - http://localhost:xxxx
-# - http://127.0.0.1:xxxx
-# - http://0.0.0.0:xxxx
-# - http://[::1]:xxxx (IPv6)
-# And https variants if you ever use them locally
 LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?$"
 
 app.add_middleware(
@@ -46,267 +30,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include Routers
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(sectors.router)
+app.include_router(ranking.router)
+app.include_router(activities.router)
+app.include_router(admin.router)
 
-# --- AUTH ---
-@app.post("/auth/google", response_model=schemas.Token)
-def google_login(data: schemas.GoogleLoginRequest, db: Session = Depends(get_db)):
-    try:
-        user = crud.login_with_google(db, data)
-        
-        # Se retornou None, é porque falta o código
-        if user is None:
-            raise HTTPException(status_code=400, detail="NEED_INVITE_CODE")
-            
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Código de convite inválido ou expirado.")
-
-    if user.status == models.UserStatus.PENDING:
-        raise HTTPException(status_code=403, detail="Cadastro recebido! Aguarde aprovação do Admin Master.")
-        
-    token = security.create_access_token(data={"sub": user.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
-    return {"access_token": token, "token_type": "bearer"}
-
-@app.post("/auth/register/admin-master", response_model=schemas.User)
-def reg_admin(d: schemas.UserCreate, db: Session = Depends(get_db)): # <--- SÓ PODE TER ISSO
-    if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
-    return crud.create_admin_master(db, d)
-
-@app.post("/auth/register/user", response_model=schemas.User, status_code=201)
-def reg_user(d: schemas.UserRegister, db: Session = Depends(get_db)):
-    if crud.get_user_by_email(db, d.email): raise HTTPException(400, "Email existe.")
-    u = crud.create_user_from_invite(db, d)
-    if not u: raise HTTPException(400, "Código de convite inválido.")
-    return u
-
-@app.post("/auth/token", response_model=schemas.Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    u = crud.get_user_by_email(db, form.username)
-    if not u or not security.verify_password(form.password, u.hashed_password): raise HTTPException(401, "Login falhou.")
-    if u.status == models.UserStatus.PENDING: raise HTTPException(403, "Conta pendente de aprovação do Admin Master.")
-    token = security.create_access_token(data={"sub": u.email}, expires_delta=timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES))
-    return {"access_token": token, "token_type": "bearer"}
-
-@app.post("/auth/send-recovery-password-email")
-def send_recovery_email_endpoint(
-    to_address: str = Query(...),
-    db: Session = Depends(get_db),
-):
-    from mailer import send_recovery_email_to_address
-
-    try:
-        send_recovery_email_to_address(db, to_address)
-        return {"detail": "OK"}
-    except ValueError as e:
-        if str(e) == "USER_NOT_FOUND":
-            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-        raise
-
-@app.post("/auth/recover-password")
-def recover_password_endpoint(data: schemas.RecoverPasswordRequest, db: Session = Depends(get_db)):
-    user = crud.get_user_by_email(db, data.email)
-    if not user:
-        raise HTTPException(404, "Usuário não encontrado.")
-
-    if not crud.check_recovery_code(db, user, data.code):
-        raise HTTPException(400, "Código inválido.")
-
-    crud.update_user_password(db, user, data.new_password)
-    crud.clear_recovery_code(db, user)
-
-    return {"detail": "Senha atualizada com sucesso."}
-
-
-# --- USER ---
-@app.get("/users/me", response_model=schemas.UserResponse)
-def me(db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    points_data, total_global = crud.get_user_points_breakdown(db, u)
-    u.points_by_sector = points_data
-    u.total_global_points = total_global
-    if u.led_sector: u.invite_code = u.led_sector.invite_code
-    else: u.invite_code = None
-    return u
-
-@app.put("/users/me/profile", response_model=schemas.User)
-def update_profile(data: schemas.UserUpdateProfile, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return crud.update_user_profile(db, u, data)
-
-@app.post("/user/join-sector")
-def join(req: schemas.JoinSectorRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"detail": crud.join_sector(db, u, req.invite_code)}
-
-@app.post("/user/checkin")
-def checkin(req: schemas.CheckInRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    # Passa req.activity_code (string)
-    return {"detail": crud.create_checkin(db, u, req.activity_code)}
-
-@app.post("/user/redeem")
-def redeem(req: schemas.RedeemCodeRequest, db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    code = crud.get_code_by_string(db, req.code_string)
-    if not code: raise HTTPException(404, "Código inválido.")
-    return {"detail": crud.redeem_code(db, u, code)}
-
-# --- RANKING ---
-@app.get("/ranking/geral", response_model=schemas.RankingResponse)
-def rank_geral(month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"ranking": crud.get_geral_ranking(db, month, year), "my_user_id": u.user_id}
-
-@app.get("/ranking/sector/{sector_id}", response_model=schemas.RankingResponse)
-def rank_sector(sector_id: int, month: Optional[int] = Query(None), year: Optional[int] = Query(None), db: Session = Depends(get_db), u: models.User = Depends(security.get_current_user)):
-    return {"my_user_id": u.user_id, "ranking": crud.get_sector_ranking(db, sector_id, month, year)}
-
-# --- LIDER ---
-@app.post("/lider/distribute-points")
-def distribute(req: schemas.DistributePointsRequest, db: Session = Depends(get_db), lider: models.User = Depends(security.get_current_lider)):
-    if not lider.led_sector: raise HTTPException(400, "Sem setor.")
-    success, msg = crud.distribute_points_from_budget(db, lider, req.user_id, req.points, req.description)
-    if not success: raise HTTPException(400, msg)
-    return {"detail": msg}
-
-@app.get("/lider/pending-users", response_model=List[schemas.UserAdminView])
-def pending(db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    # OBS: Retorna vazio pois aprovação agora é global
-    return []
-
-@app.put("/lider/approve-user/{user_id}")
-def approve(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    # Legado, mantido para não quebrar rota, mas funcionalidade movida pro Admin
-    u = crud.get_user_by_id(db, user_id)
-    if not u: raise HTTPException(404)
-    return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
-
-@app.delete("/lider/reject-user/{user_id}")
-def reject(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    u = crud.get_user_by_id(db, user_id)
-    crud.delete_user(db, u)
-    return {"ok": True}
-
-@app.post("/lider/activities", status_code=status.HTTP_201_CREATED)
-def create_act(act: schemas.ActivityCreate, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: raise HTTPException(400, "Sem setor.")
-    return crud.create_activity(db, act, l)
-
-@app.get("/lider/activities", response_model=List[schemas.Activity])
-def get_act(db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: return []
-    return crud.get_activities_by_sector(db, l.led_sector.sector_id)
-
-@app.get("/lider/users", response_model=List[schemas.UserAdminView])
-def get_sec_users(db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: return []
-    return crud.get_users_by_sector(db, l.led_sector.sector_id)
-
-@app.delete("/lider/users/{user_id}")
-def del_u(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    u = crud.get_user_by_id(db, user_id)
-    crud.delete_user(db, u)
-    return {"ok": True}
-
-@app.get("/lider/users/{user_id}/dashboard", response_model=schemas.UserDashboard)
-def get_user_dash(user_id: int, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    return crud.get_user_dashboard_details(db, user_id, l.led_sector.sector_id if l.led_sector else 0)
-
-@app.post("/lider/codes/general", status_code=status.HTTP_201_CREATED)
-def create_gen_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db), l: models.User = Depends(security.get_current_lider)):
-    if not l.led_sector: raise HTTPException(400, "Sem setor")
-    return crud.create_general_code(db, d, l)
-
-# --- ADMIN MASTER ---
-@app.post("/admin-master/system-invite")
-def create_sys_invite(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    invite = crud.generate_system_invite(db)
-    return {"code": invite.code}
-
-@app.get("/admin-master/system-invites", response_model=List[schemas.SystemInvite])
-def list_sys_invites(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_all_system_invites(db)
-
-@app.get("/admin-master/pending-global", response_model=List[schemas.UserAdminView])
-def get_pending_global(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_pending_global_users(db)
-
-@app.put("/admin-master/approve-global/{user_id}")
-def approve_global(user_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    u = crud.get_user_by_id(db, user_id)
-    return crud.update_user_status(db, u, models.UserStatus.ACTIVE)
-
-@app.post("/admin-master/budget")
-def add_budget(req: schemas.AddBudgetRequest, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    l = crud.add_budget_to_lider(db, req.lider_id, req.points)
-    if not l: raise HTTPException(404)
-    return {"detail": "OK"}
-
-@app.post("/admin-master/badges")
-def create_badge(b: schemas.BadgeCreate, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.create_badge(db, b)
-
-@app.post("/admin-master/award-badge")
-def award_badge(user_id: int = Body(...), badge_id: int = Body(...), db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return {"detail": crud.award_badge(db, user_id, badge_id)}
-
-@app.get("/admin-master/badges", response_model=List[schemas.Badge])
-def get_badges(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_all_badges(db)
-
-@app.post("/admin-master/sectors", response_model=schemas.Sector)
-def create_sec(name: str = Body(..., embed=True), db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.create_sector(db, name)
-
-@app.get("/admin-master/sectors", response_model=List[schemas.Sector])
-def get_secs(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_all_sectors(db)
-
-@app.get("/admin-master/liders", response_model=List[schemas.UserAdminView])
-def get_lids(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_liders(db)
-
-@app.get("/admin-master/users", response_model=List[schemas.UserAdminView])
-def get_all_usrs(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_all_users(db)
-
-@app.put("/admin-master/sectors/{sector_id}/assign-lider")
-def assign(sector_id: int, lider_id: int = Body(..., embed=True), db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.assign_lider_to_sector(db, lider_id, sector_id)
-    
-@app.put("/admin-master/users/{user_id}/promote-to-lider")
-def promote(user_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    u = crud.get_user_by_id(db, user_id)
-    return crud.update_user_role(db, u, models.UserRole.lider)
-
-@app.put("/admin-master/liders/{lider_id}/demote-to-user")
-def demote(lider_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    u = crud.get_user_by_id(db, lider_id)
-    return crud.update_user_role(db, u, models.UserRole.user)
-
-@app.get("/admin-master/sectors/{sector_id}/users", response_model=List[schemas.UserAdminView])
-def get_sec_usrs_admin(sector_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_users_by_sector(db, sector_id)
-
-@app.get("/admin-master/sectors/{sector_id}/ranking", response_model=schemas.RankingResponse)
-def get_sec_rank_admin(sector_id: int, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return {"my_user_id": a.user_id, "ranking": crud.get_sector_ranking(db, sector_id)}
-
-@app.get("/admin-master/audit/json")
-def audit(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_audit_logs_json(db)
-
-@app.get("/admin-master/reports/audit")
-def download_audit(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    csv_content = crud.generate_audit_csv(db)
-    response = StreamingResponse(io.StringIO(csv_content), media_type="text/csv")
-    response.headers["Content-Disposition"] = "attachment; filename=auditoria_b10.csv"
-    return response
-
-# CORREÇÃO: Endpoint para Admin criar código geral
-@app.post("/admin-master/codes/general", status_code=status.HTTP_201_CREATED)
-def create_admin_general_code(d: schemas.CodeCreateGeneral, db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    d.is_general = True
-    return crud.create_general_code(db, d, a)
-
-
-# Nota: rota de desenvolvimento `/dev/create-invite` removida. Para criar
-# convites em ambiente de desenvolvimento, use os scripts locais (ex.: create_invite.py).
-
-# CORREÇÃO: Endpoint para Admin listar códigos gerais
-@app.get("/admin-master/codes/general", response_model=List[schemas.CodeDetail])
-def get_admin_codes(db: Session = Depends(get_db), a: models.User = Depends(security.get_current_admin_master)):
-    return crud.get_general_codes(db)
+@app.get("/")
+def health_check():
+    return {"status": "ok", "service": "ritmistas-api"}

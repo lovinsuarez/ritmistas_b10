@@ -70,12 +70,15 @@ class Sector(Base):
 class User(Base):
     __tablename__ = "users"
     user_id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(UUID(as_uuid=True), unique=True, index=True, default=uuid.uuid4) # Eco UUID
     email = Column(String(100), unique=True, index=True, nullable=False)
-    username = Column(String(50), nullable=False)
+    username = Column(String(50), nullable=False, unique=True) # Nickname
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.user)
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.PENDING)
-    nickname = Column(String(50), nullable=True)
+    nickname = Column(String(50), nullable=True) # Deprecated: use username
     birth_date = Column(DateTime, nullable=True)
     profile_pic = Column(String, nullable=True)
     points_budget = Column(Integer, default=0) 

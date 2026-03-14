@@ -45,8 +45,32 @@ def get_password_hash(password: str): # Adiciona o 'str' para clareza
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    """Cria um novo token JWT."""
+    """Cria um novo token JWT com UUID e Ecosystem Role."""
     to_encode = data.copy()
+    
+    # Map Ritmistas roles to Ecosystem Standard
+    # admin -> admin, lider -> leader, user -> member
+    # Standard roles: admin, leader, sub-leader, member, viewer
+    role_map = {
+        "0": "admin",
+        "1": "leader",
+        "2": "member"
+    }
+    
+    # Standardize JWT claims
+    # sub MUST be the UUID for ecosystem standards
+    # ecosystem_role for unified RBAC
+    if "user_uuid" in to_encode:
+        to_encode["sub"] = str(to_encode["user_uuid"])
+        to_encode["user_uuid"] = str(to_encode["user_uuid"]) # Ensure this is also a string
+        # No more del user_uuid, keep it as string if legacy consumers need it
+    
+    if "role" in to_encode:
+        internal_role = to_encode["role"]
+        role_val = internal_role.value if hasattr(internal_role, "value") else str(internal_role)
+        to_encode["ecosystem_role"] = role_map.get(role_val, "member")
+        del to_encode["role"] # Remove Enum object causing serialization error
+
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:

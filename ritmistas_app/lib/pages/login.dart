@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:ritmistas_app/main.dart';
-import 'package:ritmistas_app/pages/home_page.dart' hide AppColors;
+import 'package:ritmistas_app/pages/home_page.dart';
 import 'package:ritmistas_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
