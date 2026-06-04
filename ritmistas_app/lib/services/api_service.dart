@@ -3,9 +3,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 // 1. Importa os modelos (que estão em app_models.dart)
 import 'package:ritmistas_app/models/app_models.dart';
 export 'package:ritmistas_app/models/app_models.dart';
@@ -19,11 +16,6 @@ class ApiService {
     defaultValue: 'https://ritmistas-api.onrender.com',
   );
 
-  // Chave usada para permitir criação inicial do Admin Master.
-  // Defina via --dart-define=ADMIN_CREATION_KEY=<valor> quando rodar/buildar.
-  static const String _adminCreationKey =
-      String.fromEnvironment('ADMIN_CREATION_KEY', defaultValue: '');
-
   // --- AUTH ---
 
   Future<String> login(String email, String password) async {
@@ -36,122 +28,6 @@ class ApiService {
     if (response.statusCode == 200)
       return jsonDecode(response.body)['access_token'];
     throw Exception(jsonDecode(response.body)['detail'] ?? 'Erro login');
-  }
-
-  Future<String> loginWithGoogle({String? inviteCode}) async {
-    try {
-      String email;
-      String username;
-      String googleId;
-
-      if (kIsWeb) {
-        // Web: use FirebaseAuth popup flow
-        final userCredential =
-            await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
-        final user = userCredential.user;
-        if (user == null) throw Exception('Login cancelado.');
-        email = user.email ?? '';
-        username = user.displayName ?? 'Usuário Google';
-        googleId = user.uid;
-      } else {
-        // Mobile/desktop: authenticate via GoogleSignIn
-        try {
-          final googleUser = await GoogleSignIn().signIn();
-          if (googleUser == null) throw Exception('Login cancelado.');
-          email = googleUser.email;
-          username = googleUser.displayName ?? 'Usuário Google';
-          googleId = googleUser.id ?? googleUser.email;
-        } catch (e) {
-          // normalize error message
-          final msg = e.toString();
-          if (msg.contains('cancel') || msg.contains('Cancel'))
-            throw Exception('Login cancelado.');
-          rethrow;
-        }
-      }
-
-      final url = Uri.parse('$_baseUrl/auth/google');
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "username": username,
-          "google_id": googleId,
-          "invite_code": inviteCode
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body)['access_token'];
-      } else {
-        // Tenta decodificar JSON com 'detail', caso contrário fornece mensagem HTTP bruta
-        try {
-          final errorData = jsonDecode(response.body);
-          final detail = errorData['detail'];
-          if (detail == "NEED_INVITE_CODE") throw Exception("NEED_INVITE_CODE");
-          throw Exception(detail ?? 'Falha no login Google');
-        } catch (_) {
-          throw Exception('HTTP ${response.statusCode}: ${response.body}');
-        }
-      }
-    } catch (e) {
-      if (e.toString().contains("NEED_INVITE_CODE")) rethrow;
-      throw Exception(e.toString().replaceAll("Exception: ", ""));
-    }
-  }
-
-  Future<void> registerAdminMaster(
-      {required String email,
-      required String password,
-      required String username}) async {
-    final url = Uri.parse('$_baseUrl/auth/register/admin-master');
-    final response = await http.post(url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(
-            {"email": email, "username": username, "password": password}));
-
-    if (response.statusCode != 200) {
-      // Tenta ler a mensagem de erro do servidor
-      try {
-        final errorBody = jsonDecode(response.body);
-        throw Exception("Erro ${response.statusCode}: ${errorBody['detail']}");
-      } catch (e) {
-        // Se não conseguir ler, mostra o texto bruto
-        throw Exception("Erro ${response.statusCode}: ${response.body}");
-      }
-    }
-  }
-
-  Future<void> registerUser(
-      {required String email,
-      required String password,
-      required String username,
-      required String inviteCode}) async {
-    final url = Uri.parse('$_baseUrl/auth/register/user');
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "email": email,
-        "username": username,
-        "password": password,
-        "invite_code": inviteCode
-      }),
-    );
-
-    if (response.statusCode != 201) {
-      try {
-        final errorData = jsonDecode(response.body);
-        if (response.statusCode == 422) {
-          print("Erro 422: ${response.body}");
-          throw Exception("Verifique os dados enviados.");
-        }
-        throw Exception(errorData['detail'] ?? 'Falha ao registrar');
-      } catch (e) {
-        throw Exception("Erro ${response.statusCode}: ${response.body}");
-      }
-    }
   }
 
   // --- USER ---
@@ -178,16 +54,6 @@ class ApiService {
         },
         body: jsonEncode(body));
     if (response.statusCode != 200) throw Exception('Erro atualizar perfil');
-  }
-
-  Future<void> joinSector(String token, String inviteCode) async {
-    final response = await http.post(Uri.parse('$_baseUrl/user/join-sector'),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token"
-        },
-        body: jsonEncode({"invite_code": inviteCode}));
-    if (response.statusCode != 200) throw Exception('Erro entrar setor');
   }
 
   Future<String> redeemCode(String code, String token) async {
@@ -522,74 +388,6 @@ class ApiService {
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception('Falha ao criar código geral');
     }
-  }
-
-  Future<String> createSystemInvite(String token) async {
-    final url = Uri.parse('$_baseUrl/admin-master/system-invite');
-    final response =
-        await http.post(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) return jsonDecode(response.body)['code'];
-    throw Exception('Falha ao gerar convite');
-  }
-
-  Future<List<dynamic>> getSystemInvites(String token) async {
-    final url = Uri.parse('$_baseUrl/admin-master/system-invites');
-    final response =
-        await http.get(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception('Falha ao buscar convites');
-  }
-
-  // --- Password recovery endpoints ---
-  Future<bool> sendRecoveryEmail(String toAddress) async {
-    final uri = Uri.parse(
-        '$_baseUrl/auth/send-recovery-password-email?to_address=${Uri.encodeComponent(toAddress)}');
-    final response =
-        await http.post(uri, headers: {"Content-Type": "application/json"});
-
-    if (response.statusCode == 200) return true;
-
-    try {
-      final data = jsonDecode(response.body);
-      throw Exception(data['detail'] ?? data.toString());
-    } catch (_) {
-      throw Exception(
-          'Falha ao enviar email de recuperação (${response.statusCode})');
-    }
-  }
-
-  Future<void> recoverPassword(
-      String email, String code, String newPassword) async {
-    final url = Uri.parse('$_baseUrl/auth/recover-password');
-    final response = await http.post(url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(
-            {"email": email, "code": code, "new_password": newPassword}));
-    if (response.statusCode == 200) return;
-    try {
-      final data = jsonDecode(response.body);
-      throw Exception(data['detail'] ?? 'Erro recuperar senha');
-    } catch (_) {
-      throw Exception('Falha ao recuperar senha (${response.statusCode})');
-    }
-  }
-
-  Future<List<UserAdminView>> getPendingGlobalUsers(String token) async {
-    final url = Uri.parse('$_baseUrl/admin-master/pending-global');
-    final response =
-        await http.get(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode == 200)
-      return (jsonDecode(response.body) as List)
-          .map((json) => UserAdminView.fromJson(json))
-          .toList();
-    throw Exception('Falha ao buscar pendentes globais');
-  }
-
-  Future<void> approveGlobalUser(String token, int userId) async {
-    final url = Uri.parse('$_baseUrl/admin-master/approve-global/$userId');
-    final response =
-        await http.put(url, headers: {"Authorization": "Bearer $token"});
-    if (response.statusCode != 200) throw Exception('Falha ao aprovar usuário');
   }
 
   Future<List<CodeDetail>> getAdminGeneralCodes(String token) async {

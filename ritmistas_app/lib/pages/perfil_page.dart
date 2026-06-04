@@ -21,7 +21,6 @@ class PerfilPage extends StatefulWidget {
 class _PerfilPageState extends State<PerfilPage> {
   final ApiService _apiService = ApiService();
   late Future<Map<String, dynamic>> _userDataFuture;
-  final TextEditingController _codeController = TextEditingController();
   String? _token;
 
   @override
@@ -51,46 +50,6 @@ class _PerfilPageState extends State<PerfilPage> {
       case '1': return 'Líder de Setor';
       case '2': return 'Ritmista';
       default: return 'Usuário';
-    }
-  }
-
-  void _showJoinSectorDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text("Entrar em Novo Setor", style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: _codeController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(labelText: "Código de Convite", border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar")),
-          ElevatedButton(
-            onPressed: () async {
-              if (_codeController.text.isEmpty) return;
-              Navigator.pop(context);
-              await _handleJoinSector(_codeController.text);
-            },
-            child: const Text("Entrar"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleJoinSector(String code) async {
-    if (_token == null) return;
-    try {
-      await _apiService.joinSector(_token!, code);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sucesso!"), backgroundColor: Colors.green));
-        _codeController.clear();
-        _refresh();
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: ${e.toString().replaceAll("Exception: ", "")}"), backgroundColor: Colors.red));
     }
   }
 
@@ -331,9 +290,6 @@ class _PerfilPageState extends State<PerfilPage> {
                         const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text("MEUS SETORES", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))),
                         if (sectorsPoints.isEmpty) const Center(child: Text("Nenhum setor vinculado.", style: TextStyle(color: Colors.grey))) else ...sectorsPoints.map((sector) => Card(color: AppColors.cardBackground, margin: const EdgeInsets.only(bottom: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), child: ListTile(leading: const Icon(Icons.circle, size: 12, color: AppColors.primaryYellow), title: Text(sector['sector_name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), trailing: Text("${sector['points']} pts", style: const TextStyle(color: Colors.white, fontSize: 16)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SectorRankingDetailPage(sectorId: sector['sector_id'], sectorName: sector['sector_name'])))))),
 
-                        const SizedBox(height: 12),
-                        OutlinedButton(onPressed: _showJoinSectorDialog, style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey)), child: const Text("Entrar em outro Setor", style: TextStyle(color: Colors.white))),
-                        
                         if (inviteCode != null) ...[
                           const SizedBox(height: 30),
                           Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.primaryYellow, borderRadius: BorderRadius.circular(12)), child: Column(children: [const Text("CONVITE DO SETOR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)), const SizedBox(height: 4), Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(inviteCode, style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(width: 10), InkWell(onTap: () { Clipboard.setData(ClipboardData(text: inviteCode)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.black)); }, child: const Icon(Icons.copy, color: Colors.black))])])),

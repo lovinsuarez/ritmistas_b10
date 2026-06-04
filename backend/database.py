@@ -30,6 +30,24 @@ engine = create_engine(DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
+def drop_legacy_system_invites_table() -> None:
+    from sqlalchemy import inspect, text
+
+    try:
+        insp = inspect(engine)
+        if not insp.has_table("system_invites"):
+            return
+    except Exception:
+        logger.exception("system_invites schema check failed")
+        return
+
+    is_sqlite = DATABASE_URL.startswith("sqlite")
+    sql = "DROP TABLE IF EXISTS system_invites" if is_sqlite else "DROP TABLE IF EXISTS system_invites CASCADE"
+    with engine.begin() as conn:
+        conn.execute(text(sql))
+    logger.info("Dropped legacy system_invites table")
+
 def get_db():
     db = SessionLocal()
     try:

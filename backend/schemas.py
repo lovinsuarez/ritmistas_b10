@@ -47,9 +47,6 @@ class UserBase(BaseConfig):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
 
-class UserRegister(UserCreate): 
-    invite_code: str 
-
 class UserUpdateProfile(BaseConfig):
     username: str | None = None # Nickname update
     first_name: str | None = None
@@ -97,7 +94,6 @@ class Sector(BaseConfig):
     lider_id: int | None
 
 class RedeemCodeRequest(BaseConfig): code_string: str
-class JoinSectorRequest(BaseConfig): invite_code: str
 class DistributePointsRequest(BaseConfig):
     user_id: int
     points: int
@@ -188,15 +184,6 @@ class AuditLogItem(BaseConfig):
     description: str
     points: int
     is_general: bool
-
-class GoogleLoginRequest(BaseConfig):
-    email: EmailStr
-    username: str # Nickname
-    first_name: str | None = None
-    last_name: str | None = None
-    google_id: str
-    invite_code: str | None = None
-    
 
 class RecoverPasswordRequest(BaseConfig):
     email: EmailStr

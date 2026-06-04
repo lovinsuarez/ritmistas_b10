@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base
+from database import engine, Base, drop_legacy_system_invites_table
 from routers import auth, users, sectors, ranking, activities, admin
 import os
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+drop_legacy_system_invites_table()
 
 app = FastAPI(title="Projeto Ritmistas B10 API v5")
 
@@ -30,6 +31,7 @@ app.include_router(users.router)
 app.include_router(sectors.router)
 app.include_router(ranking.router)
 app.include_router(activities.router)
+app.include_router(activities.lider_router)  # /lider/* aliases for frontend
 app.include_router(admin.router)
 
 @app.get("/")

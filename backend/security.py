@@ -70,7 +70,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
         internal_role = to_encode["role"]
         role_val = internal_role.value if hasattr(internal_role, "value") else str(internal_role)
         to_encode["ecosystem_role"] = role_map.get(role_val, "member")
-        del to_encode["role"] # Remove Enum object causing serialization error
+        to_encode["role"] = role_val  # Keep as string (not Enum) for frontend RBAC
 
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta

@@ -8,65 +8,14 @@ import urllib.request
 import os
 
 
-def login_with_google(db: Session, google_data: schemas.GoogleLoginRequest):
-    # 1. Tenta achar o usuário
-    user = get_user_by_email(db, google_data.email)
-    if user:
-        return user # Usuário existe, deixa entrar
-        
-    # 2. Se é NOVO, exige código
-    if not google_data.invite_code:
-        return None # Retorna None para avisar que precisa do código
-        
-    # 3. Valida o código
-    invite = validate_system_invite(db, google_data.invite_code)
-    if not invite:
-        raise ValueError("Código de convite inválido.")
-
-    # 4. Cria o usuário
-    random_pass = secrets.token_urlsafe(16)
-    hashed = security.get_password_hash(random_pass)
-    
-    new_user = models.User(
-        email=google_data.email,
-        username=google_data.username,
-        first_name=google_data.first_name,
-        last_name=google_data.last_name,
-        hashed_password=hashed,
-        role=models.UserRole.user,
-        status=models.UserStatus.PENDING, # Pendente de aprovação
-        nickname=google_data.username
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return new_user
-
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 def get_user_by_id(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.user_id == user_id).first()
 def get_sector_by_id(db: Session, sector_id: int):
     return db.query(models.Sector).filter(models.Sector.sector_id == sector_id).first()
-def get_sector_by_invite_code(db: Session, invite_code: str):
-    try: return db.query(models.Sector).filter(models.Sector.invite_code == invite_code).first()
-    except: return None
 def get_code_by_string(db: Session, code_string: str):
     return db.query(models.RedeemCode).filter(models.RedeemCode.code_string == code_string).first()
-
-def generate_system_invite(db: Session):
-    chars = string.ascii_uppercase + string.digits
-    code = "B10-" + "".join(random.choice(chars) for _ in range(6))
-    invite = models.SystemInvite(code=code, is_used=False)
-    db.add(invite)
-    db.commit()
-    db.refresh(invite)
-    return invite
-def get_all_system_invites(db: Session):
-    return db.query(models.SystemInvite).filter(models.SystemInvite.is_used == False).all()
-def validate_system_invite(db: Session, code: str):
-    return db.query(models.SystemInvite).filter(models.SystemInvite.code == code, models.SystemInvite.is_used == False).first()
 
 def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     hashed_password = security.get_password_hash(admin_data.password)
@@ -82,24 +31,6 @@ def create_admin_master(db: Session, admin_data: schemas.UserCreate):
     db.add(db_admin); db.commit(); db.refresh(db_admin)
     return db_admin
 
-def create_user_from_invite(db: Session, user_data: schemas.UserRegister):
-    invite = validate_system_invite(db, code=user_data.invite_code)
-    if not invite: return None 
-    hashed_password = security.get_password_hash(user_data.password)
-    db_user = models.User(
-        email=user_data.email, 
-        username=user_data.username, 
-        first_name=user_data.first_name,
-        last_name=user_data.last_name,
-        hashed_password=hashed_password, 
-        role=models.UserRole.user, 
-        status=models.UserStatus.PENDING
-    )
-    db.add(db_user); db.commit(); db.refresh(db_user)
-    return db_user
-
-def get_pending_global_users(db: Session):
-    return db.query(models.User).filter(models.User.status == models.UserStatus.PENDING).all()
 
 def create_sector(db: Session, sector_name: str):
     db_sector = models.Sector(name=sector_name)
@@ -107,30 +38,6 @@ def create_sector(db: Session, sector_name: str):
     return db_sector
 def get_all_sectors(db: Session):
     return db.query(models.Sector).all()
-def join_sector(db: Session, user: models.User, invite_code: str):
-    # 1. Busca o setor
-    sector = get_sector_by_invite_code(db, invite_code)
-    if not sector: return "Código inválido."
-    
-    # 2. Verifica se já existe o vínculo DIRETO na tabela de associação
-    exists = db.query(models.user_sectors).filter_by(
-        user_id=user.user_id, 
-        sector_id=sector.sector_id
-    ).first()
-    
-    if exists: 
-        return "Você já está neste setor."
-    
-    # 3. INSERÇÃO EXPLÍCITA (Blindada contra falhas de ORM)
-    stmt = models.user_sectors.insert().values(
-        user_id=user.user_id, 
-        sector_id=sector.sector_id
-    )
-    db.execute(stmt)
-    db.commit()
-    
-    return f"Bem-vindo ao setor {sector.name}!"
-
 def update_user_role(db: Session, user_to_update: models.User, new_role: models.UserRole):
     if new_role == models.UserRole.user and user_to_update.led_sector:
         user_to_update.led_sector.lider_id = None

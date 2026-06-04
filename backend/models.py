@@ -31,13 +31,6 @@ user_sectors = Table(
     Column('sector_id', Integer, ForeignKey('sectors.sector_id'))
 )
 
-class SystemInvite(Base):
-    __tablename__ = "system_invites"
-    id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(50), unique=True, nullable=False)
-    is_used = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now())
-
 class Badge(Base):
     __tablename__ = "badges"
     badge_id = Column(Integer, primary_key=True, index=True)

@@ -46,10 +46,6 @@ def update_profile(data: schemas.UserUpdateProfile, db: Session = Depends(databa
     
     return updated_user
 
-@router.post("/join-sector")
-def join(req: schemas.JoinSectorRequest, db: Session = Depends(database.get_db), u: models.User = Depends(security.get_current_user)):
-    return {"detail": crud.join_sector(db, u, req.invite_code)}
-
 @router.post("/checkin")
 def checkin(req: schemas.CheckInRequest, db: Session = Depends(database.get_db), u: models.User = Depends(security.get_current_user)):
     return {"detail": crud.create_checkin(db, u, req.activity_code)}
